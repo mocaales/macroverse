@@ -44,6 +44,12 @@ jobs:
       - name: Test
         working-directory: backend
         run: pytest
+      - name: Upload backend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          retention-days: 7
       - name: Apply TimescaleDB migrations
         working-directory: backend
         env:
@@ -66,6 +72,15 @@ jobs:
       - name: Lint
         working-directory: frontend
         run: npm run lint
+      - name: Test with coverage
+        working-directory: frontend
+        run: npm run test:coverage
+      - name: Upload frontend coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          retention-days: 7
       - name: Build
         working-directory: frontend
         run: npm run build
@@ -92,3 +107,42 @@ jobs:
           tags: macroverse-frontend:ci
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,mode=max,scope=frontend
+
+  sonar:
+    name: SonarQube analysis
+    if: ${{ vars.SONAR_PROJECT_KEY != '' && vars.SONAR_HOST_URL != '' }}
+    needs:
+      - backend
+      - frontend
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+      - name: Configure Sonar project
+        env:
+          SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+        run: |
+          echo "sonar.projectKey=${SONAR_PROJECT_KEY}" >> sonar-project.properties
+          if [[ -n "${SONAR_ORGANIZATION}" ]]; then
+            echo "sonar.organization=${SONAR_ORGANIZATION}" >> sonar-project.properties
+          fi
+      - name: Analyze
+        uses: SonarSource/sonarqube-scan-action@v7
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+        with:
+          args: -Dsonar.qualitygate.wait=true

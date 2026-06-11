@@ -1,0 +1,80 @@
+services:
+  - type: web
+    name: macroverse-api
+    runtime: docker
+    plan: starter
+    region: frankfurt
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/v1/health
+    preDeployCommand: python -m app.cli migrate
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - backend/**
+        - render.yaml
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_BASE64
+        sync: false
+      - key: MARKET_DATABASE_URL
+        sync: false
+      - key: MARKET_DATABASE_POOL_MIN_SIZE
+        value: "1"
+      - key: MARKET_DATABASE_POOL_MAX_SIZE
+        value: "5"
+      - key: MARKET_DATABASE_BATCH_SIZE
+        value: "25"
+      - key: COINMETRICS_API_BASE_URL
+        value: https://community-api.coinmetrics.io/v4
+      - key: FRED_API_KEY
+        sync: false
+      - key: CRYPTOQUANT_ACCESS_TOKEN
+        sync: false
+      - key: CRYPTOQUANT_SERIES_JSON
+        sync: false
+
+  - type: web
+    name: macroverse-web
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    autoDeployTrigger: checksPass
+    buildFilter:
+      paths:
+        - frontend/**
+        - render.yaml
+    envVars:
+      - key: VITE_API_URL
+        sync: false
+      - key: VITE_FIREBASE_API_KEY
+        sync: false
+      - key: VITE_FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: VITE_FIREBASE_PROJECT_ID
+        sync: false
+      - key: VITE_FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: VITE_FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: VITE_FIREBASE_APP_ID
+        sync: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

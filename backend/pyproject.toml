@@ -23,6 +23,7 @@ dependencies = [
 dev = [
   "httpx>=0.28,<1",
   "pytest>=8.3,<9",
+  "pytest-cov>=6,<8",
   "ruff>=0.9,<1",
 ]
 
@@ -32,6 +33,26 @@ include = ["app*"]
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = [
+  "--cov=app",
+  "--cov-branch",
+  "--cov-report=term-missing",
+  "--cov-report=xml:coverage.xml",
+  "--cov-fail-under=35",
+]
+
+[tool.coverage.run]
+relative_files = true
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+skip_empty = true
+show_missing = true
+exclude_lines = [
+  "pragma: no cover",
+  "if TYPE_CHECKING:",
+]
 
 [tool.ruff]
 line-length = 120

@@ -1,6 +1,8 @@
 .env
 .pytest_cache
 .ruff_cache
+coverage.xml
+htmlcov
 __pycache__
 legacy_streamlit
 tests
