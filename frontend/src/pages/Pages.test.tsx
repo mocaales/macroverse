@@ -15,6 +15,7 @@ const chartsApi = vi.hoisted(() => ({
 
 vi.mock("../features/auth/AuthProvider", () => ({ useAuth: () => auth }));
 vi.mock("../api/queries", () => ({ portfolioApi, chartsApi }));
+vi.mock("../api/client", () => ({ getApiError: () => "Request failed." }));
 vi.mock("../components/Plot", () => ({
   Plot: ({ data }: { data: Array<{ name?: string }> }) => <div data-testid="plot">{data.map((item) => item.name).join(",")}</div>
 }));
