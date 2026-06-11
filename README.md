@@ -1,477 +1,146 @@
+<div align="center">
+
 # Macroverse
 
-Macroverse is a portfolio, trade-journal, and market-research application built with a React TypeScript frontend and a FastAPI backend.
+**Portfolio intelligence, trade journaling, and market research in one analytical workspace.**
 
-Firebase provides:
+[![CI](https://github.com/mocaales/macroverse/actions/workflows/ci.yml/badge.svg)](https://github.com/mocaales/macroverse/actions/workflows/ci.yml)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=mocaales_macroverse&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=mocaales_macroverse)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=mocaales_macroverse&metric=coverage)](https://sonarcloud.io/component_measures?id=mocaales_macroverse&metric=coverage)
 
-- Firebase Authentication for email/password accounts
-- Cloud Firestore for portfolio data
-- Firebase Admin SDK identity verification in FastAPI
+[Documentation](docs/README.md) · [Architecture](docs/architecture.md) · [Development](docs/development.md) · [Deployment](docs/deployment.md) · [API](docs/api.md)
 
-TimescaleDB provides:
+</div>
 
-- durable storage for FRED, Coin Metrics, and configured CryptoQuant time series
-- efficient time-range queries for charts
-- local development through Docker and production hosting through Tiger Cloud
+---
 
-## Architecture
+Macroverse is a full-stack financial analytics application. It combines authenticated portfolio management with a trade journal, performance analytics, and durable macroeconomic and cryptocurrency time-series data.
 
-```text
-.
-├── frontend/                  React, TypeScript, Vite, Firebase Web SDK
-├── backend/
-│   ├── app/
-│   │   ├── api/               FastAPI routes and Firebase token verification
-│   │   ├── core/              configuration, Firebase, and database connections
-│   │   ├── models/            Pydantic API contracts
-│   │   ├── repositories/      Firestore and TimescaleDB persistence
-│   │   └── services/          analytics, provider clients, and data ingestion
-│   ├── migrations/            TimescaleDB schema
-│   ├── tests/
-│   └── legacy_streamlit/      previous implementation, reference only
-├── firestore.rules            denies direct client database access
-├── .github/workflows/         CI, market sync, and container releases
-├── render.yaml                Render backend and static-site blueprint
-├── sonar-project.properties   SonarQube source and coverage configuration
-└── docker-compose.yml         application, worker, and local TimescaleDB
+## Capabilities
+
+- Manage trading, investing, banking, and aggregate portfolio accounts.
+- Record trades, deposits, withdrawals, and investment holdings.
+- Calculate balance history, realised P&L, win rate, average trade, and position risk.
+- Explore FRED and Bitcoin market datasets through interactive charts.
+- Authenticate users with Firebase Authentication.
+- Persist private user data in Cloud Firestore and shared market data in TimescaleDB.
+- Synchronize provider data incrementally through a worker or scheduled GitHub Action.
+
+## Technology
+
+| Layer | Technology |
+| --- | --- |
+| Web application | React 19, TypeScript, Vite, TanStack Query, Plotly |
+| API | Python 3.13, FastAPI, Pydantic |
+| Identity | Firebase Authentication and Firebase Admin SDK |
+| User data | Cloud Firestore |
+| Market data | PostgreSQL with TimescaleDB |
+| Delivery | Docker, Nginx, Render, GitHub Container Registry |
+| Quality | Pytest, Vitest, Ruff, ESLint, SonarQube Cloud |
+
+## System Overview
+
+```mermaid
+flowchart LR
+    User[User] --> Web[React web application]
+    Web -->|Authenticate| FirebaseAuth[Firebase Authentication]
+    Web -->|Firebase ID token| API[FastAPI API]
+    API -->|Verify token| FirebaseAuth
+    API -->|Private portfolio data| Firestore[(Cloud Firestore)]
+    API -->|Market queries| Timescale[(TimescaleDB)]
+    Worker[Market sync worker] -->|FRED / Coin Metrics / CryptoQuant| Providers[Data providers]
+    Worker -->|Upsert observations| Timescale
 ```
 
-The browser authenticates directly with Firebase Authentication. Before each protected API request, it retrieves a Firebase ID token. FastAPI verifies that token with Firebase Admin and uses the immutable Firebase `uid` to access the user's Firestore documents.
+The backend is the only component allowed to access Firestore documents. Browser requests carry Firebase ID tokens, which FastAPI verifies before resolving a user-specific document path. Market data is stored separately because it is shared, append-oriented time-series data.
 
-Market data is shared application data, not user data. The `market-sync` worker downloads it from providers and upserts it into TimescaleDB. Chart routes read the stored data first and retain a direct-provider fallback while the database is empty or unavailable.
+See [Architecture](docs/architecture.md) for component, sequence, activity, and data-model diagrams.
 
-## Firebase Setup
+## Quick Start
 
-### 1. Create a Firebase project
+### Prerequisites
 
-1. Open https://console.firebase.google.com/.
-2. Select **Add project**.
-3. Complete the project creation flow.
+- Docker Desktop with Docker Compose
+- A Firebase project with Email/Password authentication enabled
+- Firebase web application configuration
+- A Firebase service account for backend access
+- A FRED API key
 
-### 2. Enable email/password authentication
-
-1. Open **Build > Authentication**.
-2. Select **Get started**.
-3. Open **Sign-in method**.
-4. Enable **Email/Password**.
-
-### 3. Create Cloud Firestore
-
-1. Open **Build > Firestore Database**.
-2. Select **Create database**.
-3. Choose **Production mode**.
-4. Select the region closest to the application's users.
-
-The repository's [firestore.rules](firestore.rules) denies all direct web-client reads and writes. All portfolio operations go through FastAPI and Firebase Admin IAM credentials.
-
-Deploy the rules with the Firebase CLI:
-
-```bash
-npm install -g firebase-tools
-firebase login
-firebase use --add
-firebase deploy --only firestore
-```
-
-### 4. Register the web application
-
-1. Open **Project settings > General**.
-2. Under **Your apps**, select the web icon.
-3. Register the app.
-4. Copy the Firebase configuration values into `.env` and `frontend/.env`.
+### Start with Docker
 
 ```bash
 cp .env.example .env
-cp frontend/.env.example frontend/.env
 ```
 
-Required frontend variables:
-
-```dotenv
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-```
-
-These web configuration values are public identifiers, not server credentials. Firestore authorization still depends on security rules and backend token verification.
-
-### 5. Configure backend credentials
-
-For local native development:
-
-1. Open **Project settings > Service accounts**.
-2. Select **Generate new private key**.
-3. Store the downloaded JSON outside version control.
-4. Set Application Default Credentials:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/firebase-service-account.json"
-```
-
-Then create the backend environment:
-
-```bash
-cp backend/.env.example backend/.env
-```
-
-Set:
-
-```dotenv
-FIREBASE_PROJECT_ID=your-firebase-project-id
-```
-
-For Docker Compose, encode the service-account file into one line:
+Complete the values in `.env`, including PostgreSQL credentials, Firebase configuration, and `FRED_API_KEY`. Encode the Firebase service account for Docker:
 
 ```bash
 base64 < /absolute/path/firebase-service-account.json | tr -d '\n'
 ```
 
-Place the result in the root `.env`:
-
-```dotenv
-FIREBASE_SERVICE_ACCOUNT_BASE64=encoded-value
-```
-
-Never commit the service-account JSON or encoded credential.
-
-## Firestore Data Model
-
-```text
-users/{firebaseUid}
-├── email
-├── favourites[]
-├── accounts/{accountId}
-├── trades/{tradeId}
-└── investments/{investmentId}
-```
-
-Passwords and sessions are not stored in Firestore. Firebase Authentication stores credentials, and Firebase ID tokens provide the authenticated session.
-
-## Market Database Setup
-
-### Local setup with Docker
-
-This is the simplest way to start. Docker creates PostgreSQL with the TimescaleDB extension, applies the migration, and starts the hourly ingestion worker.
-
-1. Create local environment files:
+Set the result as `FIREBASE_SERVICE_ACCOUNT_BASE64`, then start the stack:
 
 ```bash
-cp .env.example .env
-cp frontend/.env.example frontend/.env
-cp backend/.env.example backend/.env
+make docker-up
 ```
 
-2. Fill in the Firebase variables and `FRED_API_KEY`. Set every `POSTGRES_*` field in the root `.env`. Generate the password locally:
-
-```bash
-openssl rand -base64 32
-```
-
-Store the generated value as `POSTGRES_PASSWORD`. Set the database host, port, database name, and username in the same ignored file. Leave `MARKET_DATABASE_URL` empty for local Docker because the backend constructs its connection from those separate fields.
-
-3. Start the complete stack:
-
-```bash
-docker compose up --build
-```
-
-The first image download can take several minutes. The persistent `timescale_data` Docker volume retains market data after containers restart.
-
-Useful checks:
-
-```bash
-docker compose ps
-docker compose logs -f market-sync
-curl http://localhost:8000/api/v1/health/market
-```
-
-To stop containers without deleting data:
-
-```bash
-docker compose down
-```
-
-Only use `docker compose down --volumes` when you intentionally want to delete the local market database.
-
-### Production setup with Tiger Cloud
-
-Tiger Cloud is the managed TimescaleDB option. It avoids operating database backups, upgrades, failover, and storage yourself.
-
-1. Open [Tiger Cloud](https://console.cloud.timescale.com/) and create an account.
-2. Select **Create service**.
-3. Choose a PostgreSQL/Timescale service and a region close to the production backend.
-4. Wait for the service to become ready.
-5. Open the service and select **Connect**.
-6. Copy the PostgreSQL connection string and store the generated password securely.
-
-Store the connection string supplied by Tiger Cloud:
-
-```dotenv
-MARKET_DATABASE_URL=<Tiger Cloud connection string>
-```
-
-Do not commit this value. Add it to the production backend's secret environment variables.
-
-Apply the schema and load the initial data after exporting the production environment:
-
-```bash
-cd backend
-.venv/bin/python -m app.cli migrate
-.venv/bin/python -m app.cli sync-all
-```
-
-For production, run the `market-sync` container continuously next to the backend. The scheduled GitHub workflow is also provided as a recovery mechanism, but GitHub scheduled jobs can be delayed and should not be the only scheduler for strict freshness requirements.
-
-### GitHub Actions secrets
-
-In GitHub, open **Settings > Secrets and variables > Actions > New repository secret** and add:
-
-| Secret | Purpose |
+| Service | URL |
 | --- | --- |
-| `MARKET_DATABASE_URL` | Tiger Cloud PostgreSQL URL with `sslmode=require` |
-| `CI_POSTGRES_HOST` | Host used by the isolated CI database |
-| `CI_POSTGRES_PORT` | Port used by the isolated CI database |
-| `CI_POSTGRES_DB` | Database name used by CI |
-| `CI_POSTGRES_USER` | Database user used by CI |
-| `CI_POSTGRES_PASSWORD` | Database password used by CI |
-| `FRED_API_KEY` | FRED API key |
-| `CRYPTOQUANT_ACCESS_TOKEN` | CryptoQuant API token, when used |
-| `CRYPTOQUANT_SERIES_JSON` | JSON configuration for CryptoQuant series |
+| Web application | http://localhost:8080 |
+| OpenAPI documentation | http://localhost:8000/api/docs |
+| API health | http://localhost:8000/api/v1/health |
+| Market database health | http://localhost:8000/api/v1/health/market |
 
-The workflow in `.github/workflows/market-sync.yml` runs hourly and can also be started from **Actions > Market data sync > Run workflow**.
+Stop the application without deleting database data:
 
-The Firebase web configuration is public and should be stored as GitHub repository variables, not secrets. Open **Settings > Secrets and variables > Actions > Variables** and add:
-
-- `VITE_FIREBASE_API_KEY`
-- `VITE_FIREBASE_AUTH_DOMAIN`
-- `VITE_FIREBASE_PROJECT_ID`
-- `VITE_FIREBASE_STORAGE_BUCKET`
-- `VITE_FIREBASE_MESSAGING_SENDER_ID`
-- `VITE_FIREBASE_APP_ID`
-- `VITE_API_URL` when the production API is hosted separately from the frontend
-
-The release workflow injects these values when building the frontend container.
-
-If a database IP allow list is enabled, standard GitHub-hosted runners do not have a stable outbound IP. Use a self-hosted runner or another scheduler with static egress instead of opening unrestricted database access.
-
-### Provider configuration
-
-Bitcoin prices use the free Coin Metrics Community API:
-
-```dotenv
-COINMETRICS_API_BASE_URL=https://community-api.coinmetrics.io/v4
+```bash
+make docker-down
 ```
 
-No API key is required. Macroverse stores the daily `PriceUSD` reference-rate metric from January 1, 2011 onward.
+For native development, Firebase setup, and database initialization, follow the [Development Guide](docs/development.md).
 
-FRED:
-
-```dotenv
-FRED_API_KEY=your-fred-api-key
-```
-
-CryptoQuant series are configured as a single-line JSON array. Use the exact endpoint and field names available in your CryptoQuant account:
-
-```dotenv
-CRYPTOQUANT_ACCESS_TOKEN=your-token
-CRYPTOQUANT_SERIES_JSON=[{"series_id":"cryptoquant:btc:example:1d","endpoint":"your/endpoint","value_key":"your_value_field","name":"BTC Example Metric","unit":"BTC","window":"day"}]
-```
-
-Provider API plans and licences determine which data may be downloaded, retained, and redistributed. Verify those terms before exposing stored data publicly.
-
-### Market data model
+## Repository Layout
 
 ```text
-market_series
-├── series_id                 stable internal identifier
-├── provider                  fred, coinmetrics, or cryptoquant
-├── name, symbol, interval
-├── unit and metadata
-├── last_synced_at
-└── latest_observed_at         incremental ingestion cursor
-
-market_observations           TimescaleDB hypertable
-├── series_id + observed_at   primary key
-├── value                     scalar metric
-├── open, high, low, close
-├── volume
-└── ingested_at
+macroverse/
+├── frontend/                 React and TypeScript web application
+├── backend/
+│   ├── app/                  FastAPI application and worker
+│   ├── migrations/           TimescaleDB schema migrations
+│   ├── tests/                Backend unit and integration tests
+│   └── legacy_streamlit/     Previous implementation, reference only
+├── docs/                     Architecture and operational documentation
+├── .github/workflows/        CI, release, and market synchronization
+├── docker-compose.yml        Local application stack
+├── render.yaml               Render deployment blueprint
+├── firestore.rules           Deny-by-default Firestore client rules
+└── sonar-project.properties  SonarQube analysis configuration
 ```
 
-Routine synchronization requests the most recent 7 days and uses an upsert. This captures provider corrections without creating duplicate observations or querying the database for a cursor.
-Writes are committed in small batches so initial history imports remain within low-memory database service limits and can resume after interruption.
-The optional GitHub repository variable `MARKET_DATABASE_BATCH_SIZE` controls this size and defaults to `25`.
+## Quality
 
-Use `python -m app.cli sync-all --full` only for the initial historical backfill. In GitHub Actions, manually run **Market data sync** with **Load complete provider history** enabled. Scheduled runs always use the recent update window.
-
-## Existing MongoDB Data
-
-The application no longer reads MongoDB.
-
-Existing portfolio data is not automatically copied into Firestore. Existing custom PBKDF2 users also do not automatically become Firebase Authentication users.
-
-For a clean development environment, register new users through the application. For production migration:
-
-1. Create or import each user in Firebase Authentication.
-2. Build an email-to-Firebase-UID mapping.
-3. Copy each MongoDB user's accounts, trades, investments, and favourites into `users/{uid}`.
-4. Validate document counts and financial totals before switching production traffic.
-
-Do not delete the MongoDB database until this reconciliation is complete.
-
-## Run With Docker
-
-After completing the root `.env`:
-
-```bash
-docker compose up --build
-```
-
-- Application: http://localhost:8080
-- API documentation: http://localhost:8000/api/docs
-- API health: http://localhost:8000/api/v1/health
-- Market database health: http://localhost:8000/api/v1/health/market
-
-Stop the stack with:
-
-```bash
-docker compose down
-```
-
-Firestore remains hosted by Firebase. Docker starts a local TimescaleDB container only for shared market time-series data.
-
-## Native Development
-
-Install dependencies:
-
-```bash
-make install
-```
-
-Run FastAPI:
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/firebase-service-account.json"
-make backend
-```
-
-Run React in another terminal:
-
-```bash
-make frontend
-```
-
-Vite runs at http://localhost:5173 and proxies `/api` to http://localhost:8000.
-
-For native backend development, start only the local market database and apply its migration:
-
-```bash
-docker compose up -d timescaledb
-make migrate
-make sync-all
-```
-
-## Quality Checks
-
-```bash
-make lint
-make test
-make coverage
-make build
-docker compose config
-docker compose build
-```
-
-Run all local code-quality checks with:
+Run the complete local quality gate:
 
 ```bash
 make quality
 ```
 
-Coverage reports are written to `backend/coverage.xml` and `frontend/coverage/lcov.info`.
-The current coverage floors prevent regression while additional route and page tests are added over time.
+This runs backend and frontend linting, tests with coverage, and the production frontend build. Coverage thresholds are enforced in both projects.
 
-GitHub Actions runs backend and frontend linting, unit tests with coverage, production builds, database migrations, and Docker image builds.
+GitHub Actions additionally validates TimescaleDB migrations, builds both container images, and submits coverage-aware analysis to SonarQube Cloud.
 
-### SonarQube
+## Documentation
 
-SonarQube analysis is enabled when these GitHub Actions settings exist:
-
-| Type | Name | Value |
-| --- | --- | --- |
-| Secret | `SONAR_TOKEN` | Token generated by SonarQube |
-| Variable | `SONAR_HOST_URL` | Server URL, such as `https://sonarcloud.io` |
-| Variable | `SONAR_PROJECT_KEY` | SonarQube project key |
-| Variable | `SONAR_ORGANIZATION` | SonarQube Cloud organization; omit for self-hosted SonarQube |
-
-For SonarQube Cloud, disable automatic analysis and use CI-based analysis so the Python XML and TypeScript LCOV coverage reports are imported. The Sonar quality gate is configured to fail the analysis job when the gate fails.
-
-## Render Deployment
-
-The root `render.yaml` creates:
-
-- `macroverse-api`: Docker-based FastAPI web service in Frankfurt
-- `macroverse-web`: React static site with SPA route rewrites
-
-The existing Tiger Cloud service remains the production market database. The blueprint does not create a second database.
-
-1. Push the repository and ensure GitHub CI passes.
-2. In Render, select **New > Blueprint** and connect the repository.
-3. Render detects `render.yaml`. Enter every prompted environment value.
-4. Deploy the API and note its URL, such as `https://macroverse-api.onrender.com`.
-5. Set the frontend's `VITE_API_URL` to `https://macroverse-api.onrender.com/api/v1`.
-6. Set the backend's `CORS_ORIGINS` to `https://macroverse-web.onrender.com`.
-
-Do not include trailing slashes. Use comma-separated origins when both a Render domain and custom domain are active.
-
-Backend Render secrets:
-
-```dotenv
-FIREBASE_PROJECT_ID=
-FIREBASE_SERVICE_ACCOUNT_BASE64=
-MARKET_DATABASE_URL=
-FRED_API_KEY=
-CRYPTOQUANT_ACCESS_TOKEN=
-CRYPTOQUANT_SERIES_JSON=[]
-```
-
-Frontend Render build variables:
-
-```dotenv
-VITE_API_URL=https://macroverse-api.onrender.com/api/v1
-VITE_FIREBASE_API_KEY=
-VITE_FIREBASE_AUTH_DOMAIN=
-VITE_FIREBASE_PROJECT_ID=
-VITE_FIREBASE_STORAGE_BUCKET=
-VITE_FIREBASE_MESSAGING_SENDER_ID=
-VITE_FIREBASE_APP_ID=
-```
-
-The API applies database migrations before each deployment and exposes `/api/v1/health` for Render health checks. Both services deploy only after GitHub checks pass.
-
-In Firebase, open **Authentication > Settings > Authorized domains** and add `macroverse-web.onrender.com`. Add the custom frontend domain there as well when one is configured.
-
-Version tags continue to publish frontend and backend images to GitHub Container Registry.
-
-## API
-
-Protected routes require:
-
-```http
-Authorization: Bearer <Firebase-ID-token>
-```
-
-| Area | Routes |
+| Document | Purpose |
 | --- | --- |
-| Authentication verification | `/auth/me` |
-| Accounts | `/portfolio/accounts` |
-| Trades | `/portfolio/trades` |
-| Investments | `/portfolio/assets` |
-| Analytics | `/portfolio/dashboard/{account}`, `/portfolio/journal/{account}/summary` |
-| Charts | `/charts`, `/charts/{slug}/series`, `/charts/favourites` |
-| Health | `/health`, `/health/market` |
+| [Documentation index](docs/README.md) | Navigation and ownership |
+| [Architecture](docs/architecture.md) | Components, data flows, decisions, and diagrams |
+| [Development](docs/development.md) | Environment setup, commands, and testing |
+| [API reference](docs/api.md) | Authentication, endpoints, and examples |
+| [Deployment](docs/deployment.md) | Firebase, Tiger Cloud, Render, and release flow |
+| [Operations](docs/operations.md) | Market sync, migrations, monitoring, and recovery |
+| [Security](docs/security.md) | Trust boundaries, secrets, CORS, and data protection |
 
-Use `/api/docs` as the authoritative request and response contract.
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request. Security reports should follow [SECURITY.md](SECURITY.md).
