@@ -1,4 +1,9 @@
-export function EmptyState({ title, body }: { title: string; body: string }) {
+interface EmptyStateProps {
+  readonly title: string;
+  readonly body: string;
+}
+
+export function EmptyState({ title, body }: EmptyStateProps) {
   return (
     <div className="empty-state">
       <span className="status-dot" />

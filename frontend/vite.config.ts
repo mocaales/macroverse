@@ -15,13 +15,15 @@ export default defineConfig({
         "src/**/*.d.ts",
         "src/**/*.test.{ts,tsx}",
         "src/main.tsx",
-        "src/firebase.ts"
+        "src/firebase.ts",
+        "src/components/Plot.tsx",
+        "src/test/**"
       ],
       thresholds: {
-        statements: 15,
-        branches: 8,
-        functions: 12,
-        lines: 15
+        statements: 90,
+        branches: 80,
+        functions: 85,
+        lines: 90
       }
     }
   },

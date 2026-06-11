@@ -11,7 +11,7 @@ from app.repositories.market import MarketRepository
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
+@router.get("/health")
 def health() -> HealthResponse:
     return HealthResponse(status="ok", service="macroverse-api", timestamp=datetime.now(UTC))
 

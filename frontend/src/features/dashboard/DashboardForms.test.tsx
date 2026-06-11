@@ -52,11 +52,15 @@ describe("dashboard forms", () => {
     expect(screen.getByText("$200.00")).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Risk %"), { target: { value: "2" } });
+    fireEvent.change(screen.getByLabelText("Portfolio"), { target: { value: "12000" } });
+    fireEvent.change(screen.getByLabelText("Stop %"), { target: { value: "3" } });
+    fireEvent.change(screen.getByLabelText("Leverage"), { target: { value: "4" } });
+    fireEvent.change(screen.getByLabelText("Reward ratio"), { target: { value: "3" } });
 
-    expect(screen.getByText("$3,333.33")).toBeInTheDocument();
-    expect(screen.getByText("$10,000.00")).toBeInTheDocument();
-    expect(screen.getByText("$200.00")).toBeInTheDocument();
-    expect(screen.getByText("$400.00")).toBeInTheDocument();
+    expect(screen.getByText("$2,000.00")).toBeInTheDocument();
+    expect(screen.getByText("$8,000.00")).toBeInTheDocument();
+    expect(screen.getByText("$240.00")).toBeInTheDocument();
+    expect(screen.getByText("$720.00")).toBeInTheDocument();
   });
 
   it("reports account selection changes", () => {

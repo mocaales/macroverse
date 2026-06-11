@@ -21,6 +21,55 @@ function transformSeries(chart: ChartDefinition, series: ChartSeries[]) {
   });
 }
 
+function chartContent(
+  chart: ChartDefinition,
+  series: ChartSeries[],
+  isLoading: boolean,
+  isError: boolean
+) {
+  if (!chart.available) {
+    return (
+      <EmptyState
+        title="Chart is being migrated"
+        body="The original chart remains in the legacy reference while its data model is moved to the API."
+      />
+    );
+  }
+  if (isLoading) {
+    return <EmptyState title="Loading market data" body="External sources can take several seconds to respond." />;
+  }
+  if (isError) {
+    return (
+      <EmptyState
+        title="Market data unavailable"
+        body="Check the backend API keys and external data-provider connectivity."
+      />
+    );
+  }
+  const displaySeries = transformSeries(chart, series);
+  return (
+    <Plot
+      data={displaySeries.map((item) => ({
+        x: item.points.map((point) => point.date),
+        y: item.points.map((point) => point.value),
+        name: item.name,
+        type: "scatter",
+        mode: "lines",
+        line: { width: 1.7 }
+      }))}
+      layout={{
+        autosize: true, height: 610, margin: { l: 64, r: 20, t: 30, b: 48 },
+        paper_bgcolor: "transparent", plot_bgcolor: "transparent",
+        font: { color: "#7e899f", family: "IBM Plex Mono" },
+        xaxis: { gridcolor: "#1b2230" }, yaxis: { gridcolor: "#1b2230" },
+        legend: { orientation: "h", y: 1.08 }
+      }}
+      config={{ responsive: true, displaylogo: false }}
+      useResizeHandler style={{ width: "100%" }}
+    />
+  );
+}
+
 export function ChartsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -44,7 +93,6 @@ export function ChartsPage() {
   }), [charts.data, search, category]);
 
   if (selected) {
-    const displaySeries = transformSeries(selected, series.data || []);
     return (
       <div className="page">
         <button className="text-button back-button" onClick={() => setSelected(null)}><ArrowLeft size={16} /> Back to charts</button>
@@ -53,28 +101,7 @@ export function ChartsPage() {
           {user && <button className="icon-button starred" onClick={() => toggle.mutate(selected.name)}><Star size={18} fill={favourites.data?.includes(selected.name) ? "currentColor" : "none"} /></button>}
         </section>
         <section className="panel chart-detail">
-          {!selected.available ? <EmptyState title="Chart is being migrated" body="The original chart remains in the legacy reference while its data model is moved to the API." /> :
-          series.isLoading ? <EmptyState title="Loading market data" body="External sources can take several seconds to respond." /> :
-          series.isError ? <EmptyState title="Market data unavailable" body="Check the backend API keys and external data-provider connectivity." /> :
-          <Plot
-            data={displaySeries.map((item) => ({
-              x: item.points.map((point) => point.date),
-              y: item.points.map((point) => point.value),
-              name: item.name,
-              type: "scatter",
-              mode: "lines",
-              line: { width: 1.7 }
-            }))}
-            layout={{
-              autosize: true, height: 610, margin: { l: 64, r: 20, t: 30, b: 48 },
-              paper_bgcolor: "transparent", plot_bgcolor: "transparent",
-              font: { color: "#7e899f", family: "IBM Plex Mono" },
-              xaxis: { gridcolor: "#1b2230" }, yaxis: { gridcolor: "#1b2230" },
-              legend: { orientation: "h", y: 1.08 }
-            }}
-            config={{ responsive: true, displaylogo: false }}
-            useResizeHandler style={{ width: "100%" }}
-          />}
+          {chartContent(selected, series.data || [], series.isLoading, series.isError)}
         </section>
       </div>
     );

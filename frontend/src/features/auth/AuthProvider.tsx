@@ -12,7 +12,11 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+interface AuthProviderProps {
+  readonly children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -33,11 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    const clear = () => {
-      void signOut(firebaseAuth);
+    const clear = async () => {
+      await signOut(firebaseAuth);
     };
-    window.addEventListener("macroverse:unauthorized", clear);
-    return () => window.removeEventListener("macroverse:unauthorized", clear);
+    globalThis.addEventListener("macroverse:unauthorized", clear);
+    return () => globalThis.removeEventListener("macroverse:unauthorized", clear);
   }, []);
 
   const value = useMemo<AuthContextValue>(

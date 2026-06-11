@@ -13,6 +13,8 @@ from app.services.market_sync import (
     sync_fred,
 )
 
+FULL_HISTORY_HELP = "Load complete provider history"
+
 
 def migrate() -> None:
     pool = get_market_pool()
@@ -44,14 +46,14 @@ def main() -> None:
     subcommands.add_parser("migrate", help="Apply TimescaleDB schema migrations")
     sync_fred_parser = subcommands.add_parser("sync-fred", help="Synchronize FRED series")
     sync_fred_parser.add_argument("series", nargs="*", help="Optional FRED series IDs")
-    sync_fred_parser.add_argument("--full", action="store_true", help="Load complete provider history")
+    sync_fred_parser.add_argument("--full", action="store_true", help=FULL_HISTORY_HELP)
     sync_bitcoin_parser = subcommands.add_parser("sync-bitcoin", help="Synchronize daily Bitcoin/USD history")
-    sync_bitcoin_parser.add_argument("--full", action="store_true", help="Load complete provider history")
+    sync_bitcoin_parser.add_argument("--full", action="store_true", help=FULL_HISTORY_HELP)
     sync_all_parser = subcommands.add_parser(
         "sync-all",
         help="Synchronize FRED, Bitcoin, and configured CryptoQuant series",
     )
-    sync_all_parser.add_argument("--full", action="store_true", help="Load complete provider history")
+    sync_all_parser.add_argument("--full", action="store_true", help=FULL_HISTORY_HELP)
     cryptoquant = subcommands.add_parser("sync-cryptoquant", help="Synchronize one CryptoQuant series")
     cryptoquant.add_argument("--series-id", required=True)
     cryptoquant.add_argument("--endpoint", required=True)

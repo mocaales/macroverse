@@ -5,7 +5,11 @@ export interface Metric {
   tone?: "positive" | "negative" | "neutral";
 }
 
-export function MetricStrip({ metrics }: { metrics: Metric[] }) {
+interface MetricStripProps {
+  readonly metrics: Metric[];
+}
+
+export function MetricStrip({ metrics }: MetricStripProps) {
   return (
     <section className="metric-strip">
       {metrics.map((metric) => (

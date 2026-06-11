@@ -44,12 +44,17 @@ def create_account(
 def trades(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-    account: str | None = Query(default=None),
+    account: Annotated[str | None, Query()] = None,
 ) -> list[dict]:
     return repository.list_trades(user.uid, account)
 
 
-@router.post("/trades", response_model=TradeResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/trades",
+    response_model=TradeResponse,
+    status_code=status.HTTP_201_CREATED,
+    responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "A symbol is required for trades."}},
+)
 def create_trade(
     payload: TradeCreate,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -67,7 +72,11 @@ def create_trade(
     return repository.create_trade(user.uid, data)
 
 
-@router.put("/trades/{trade_id}", response_model=TradeResponse)
+@router.put(
+    "/trades/{trade_id}",
+    response_model=TradeResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Trade not found."}},
+)
 def update_trade(
     trade_id: str,
     payload: TradeUpdate,
@@ -87,7 +96,11 @@ def update_trade(
     return trade
 
 
-@router.delete("/trades/{trade_id}", response_model=Message)
+@router.delete(
+    "/trades/{trade_id}",
+    response_model=Message,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Trade not found."}},
+)
 def delete_trade(
     trade_id: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -103,7 +116,7 @@ def delete_trade(
 def assets(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-    account: str | None = Query(default=None),
+    account: Annotated[str | None, Query()] = None,
 ) -> list[dict]:
     return repository.list_assets(user.uid, account)
 
@@ -117,7 +130,11 @@ def create_asset(
     return repository.create_asset(user.uid, payload.model_dump())
 
 
-@router.delete("/assets/{asset_id}", response_model=Message)
+@router.delete(
+    "/assets/{asset_id}",
+    response_model=Message,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Asset not found."}},
+)
 def delete_asset(
     asset_id: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -129,7 +146,11 @@ def delete_asset(
     return {"message": "Asset deleted."}
 
 
-@router.get("/dashboard/{account_name}", response_model=DashboardSummary)
+@router.get(
+    "/dashboard/{account_name}",
+    response_model=DashboardSummary,
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Account not found."}},
+)
 def dashboard(
     account_name: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],

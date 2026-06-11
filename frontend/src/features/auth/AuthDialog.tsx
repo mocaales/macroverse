@@ -6,7 +6,17 @@ import { getApiError } from "../../api/client";
 import { firebaseAuth } from "../../firebase";
 import { useAuth } from "./AuthProvider";
 
-export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+interface AuthDialogProps {
+  readonly open: boolean;
+  readonly onClose: () => void;
+}
+
+function submitLabel(mode: "login" | "register", submitting: boolean) {
+  if (submitting) return "Please wait...";
+  return mode === "login" ? "Sign in" : "Create account";
+}
+
+export function AuthDialog({ open, onClose }: AuthDialogProps) {
   const { user, logout } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -40,8 +50,8 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
   };
 
   return (
-    <div className="modal-backdrop" role="presentation" onMouseDown={onClose}>
-      <section className="modal" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}>
+    <dialog className="modal-backdrop" open onCancel={onClose}>
+      <section className="modal">
         <button className="icon-button modal-close" onClick={onClose} aria-label="Close account dialog">
           <X size={18} />
         </button>
@@ -65,11 +75,11 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
             <h2>{mode === "login" ? "Sign in to Macroverse" : "Create your account"}</h2>
             <form onSubmit={submit} className="stack">
               <label>
-                Email
+                <span>Email</span>
                 <input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} />
               </label>
               <label>
-                Password
+                <span>Password</span>
                 <input
                   type="password"
                   minLength={8}
@@ -80,7 +90,7 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
               </label>
               {mode === "register" && (
                 <label>
-                  Confirm password
+                  <span>Confirm password</span>
                   <input
                     type="password"
                     minLength={8}
@@ -92,7 +102,7 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
               )}
               {error && <p className="form-error">{error}</p>}
               <button className="button primary" disabled={submitting}>
-                {submitting ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
+                {submitLabel(mode, submitting)}
               </button>
             </form>
             <button className="text-button" onClick={() => setMode(mode === "login" ? "register" : "login")}>
@@ -101,6 +111,6 @@ export function AuthDialog({ open, onClose }: { open: boolean; onClose: () => vo
           </>
         )}
       </section>
-    </div>
+    </dialog>
   );
 }

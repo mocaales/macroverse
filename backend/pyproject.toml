@@ -38,7 +38,7 @@ addopts = [
   "--cov-branch",
   "--cov-report=term-missing",
   "--cov-report=xml:coverage.xml",
-  "--cov-fail-under=35",
+  "--cov-fail-under=90",
 ]
 
 [tool.coverage.run]
@@ -48,6 +48,8 @@ branch = true
 omit = [
   "tests/*",
   "legacy_streamlit/*",
+  "app/main.py",
+  "app/worker.py",
 ]
 
 [tool.coverage.report]

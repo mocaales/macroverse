@@ -1,13 +1,15 @@
 import { useState, type FormEvent } from "react";
 import type { AccountType } from "../../types";
 
+interface CreateAccountFormProps {
+  readonly onCreate: (payload: { name: string; starting_balance: number; type: AccountType }) => void;
+  readonly busy: boolean;
+}
+
 export function CreateAccountForm({
   onCreate,
   busy
-}: {
-  onCreate: (payload: { name: string; starting_balance: number; type: AccountType }) => void;
-  busy: boolean;
-}) {
+}: CreateAccountFormProps) {
   const [name, setName] = useState("");
   const [startingBalance, setStartingBalance] = useState(0);
   const [type, setType] = useState<AccountType>("Trading");
@@ -22,11 +24,11 @@ export function CreateAccountForm({
   return (
     <form className="inline-form" onSubmit={submit}>
       <label>
-        Account name
+        <span>Account name</span>
         <input value={name} placeholder="e.g. Binance Spot" onChange={(event) => setName(event.target.value)} />
       </label>
       <label>
-        Account type
+        <span>Account type</span>
         <select value={type} onChange={(event) => setType(event.target.value as AccountType)}>
           <option>Trading</option>
           <option>Investing</option>
@@ -35,7 +37,7 @@ export function CreateAccountForm({
         </select>
       </label>
       <label>
-        Starting balance
+        <span>Starting balance</span>
         <input
           type="number"
           min="0"

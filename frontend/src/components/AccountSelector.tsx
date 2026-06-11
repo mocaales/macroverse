@@ -1,14 +1,16 @@
 import type { Account } from "../types";
 
+interface AccountSelectorProps {
+  readonly accounts: Account[];
+  readonly value: string;
+  readonly onChange: (value: string) => void;
+}
+
 export function AccountSelector({
   accounts,
   value,
   onChange
-}: {
-  accounts: Account[];
-  value: string;
-  onChange: (value: string) => void;
-}) {
+}: AccountSelectorProps) {
   return (
     <label className="compact-field">
       <span>Account</span>

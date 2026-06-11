@@ -1,13 +1,9 @@
 import { useState, type FormEvent } from "react";
 import type { ActionType } from "../../types";
 
-export function TradeForm({
-  account,
-  onSubmit,
-  busy
-}: {
-  account: string;
-  onSubmit: (payload: {
+interface TradeFormProps {
+  readonly account: string;
+  readonly onSubmit: (payload: {
     account: string;
     trade_time: string;
     action: ActionType;
@@ -15,8 +11,14 @@ export function TradeForm({
     symbol: string;
     pnl: number;
   }) => void;
-  busy: boolean;
-}) {
+  readonly busy: boolean;
+}
+
+export function TradeForm({
+  account,
+  onSubmit,
+  busy
+}: TradeFormProps) {
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [action, setAction] = useState<ActionType>("Trade");
   const [direction, setDirection] = useState("Long");
@@ -40,11 +42,11 @@ export function TradeForm({
     <form className="stack" onSubmit={submit}>
       <div className="form-grid two">
         <label>
-          Entry date
+          <span>Entry date</span>
           <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         </label>
         <label>
-          Action
+          <span>Action</span>
           <select value={action} onChange={(event) => setAction(event.target.value as ActionType)}>
             <option>Trade</option>
             <option>Deposit</option>
@@ -55,20 +57,20 @@ export function TradeForm({
       {action === "Trade" && (
         <div className="form-grid two">
           <label>
-            Direction
+            <span>Direction</span>
             <select value={direction} onChange={(event) => setDirection(event.target.value)}>
               <option>Long</option>
               <option>Short</option>
             </select>
           </label>
           <label>
-            Symbol
+            <span>Symbol</span>
             <input required value={symbol} placeholder="BTCUSDT" onChange={(event) => setSymbol(event.target.value)} />
           </label>
         </div>
       )}
       <label>
-        {action === "Trade" ? "Realised P&L" : "Amount"}
+        <span>{action === "Trade" ? "Realised P&L" : "Amount"}</span>
         <input
           type="number"
           step="0.01"

@@ -36,4 +36,28 @@ describe("API queries", () => {
     expect(api.get).toHaveBeenCalledWith("/portfolio/dashboard/Crypto%20%2F%20Main");
     expect(api.post).toHaveBeenCalledWith("/charts/favourites/Treasury%20spread%20%2F%2010Y");
   });
+
+  it("covers every portfolio and chart endpoint", async () => {
+    api.get.mockResolvedValue({ data: [] });
+    api.post.mockResolvedValue({ data: {} });
+    api.put.mockResolvedValue({ data: {} });
+    api.delete.mockResolvedValue({ data: { message: "deleted" } });
+
+    await portfolioApi.accounts();
+    await portfolioApi.createAccount({ name: "Main", type: "Trading", starting_balance: 0 });
+    await portfolioApi.createTrade({ account: "Main", trade_time: "2026-01-01", action: "Trade", symbol: "BTC", pnl: 1 });
+    await portfolioApi.updateTrade({ id: "t1", pnl: 2 });
+    await portfolioApi.deleteTrade("t1");
+    await portfolioApi.assets("Main");
+    await portfolioApi.createAsset({ account: "Main", symbol: "BTC", quantity: 1, unit: "units", display_quantity: 1 });
+    await portfolioApi.deleteAsset("a1");
+    await portfolioApi.journalSummary("Main / USD");
+    await chartsApi.charts();
+    await chartsApi.favourites();
+    await chartsApi.series("yield curve");
+
+    expect(api.put).toHaveBeenCalledWith("/portfolio/trades/t1", { pnl: 2 });
+    expect(api.get).toHaveBeenCalledWith("/portfolio/journal/Main%20%2F%20USD/summary");
+    expect(api.get).toHaveBeenCalledWith("/charts/yield curve/series");
+  });
 });

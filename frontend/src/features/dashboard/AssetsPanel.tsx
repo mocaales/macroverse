@@ -2,19 +2,21 @@ import { useState, type FormEvent } from "react";
 import { Trash2 } from "lucide-react";
 import type { Asset } from "../../types";
 
+interface AssetsPanelProps {
+  readonly account: string;
+  readonly assets: Asset[];
+  readonly onCreate: (payload: Omit<Asset, "id" | "created_at">) => void;
+  readonly onDelete: (id: string) => void;
+  readonly busy: boolean;
+}
+
 export function AssetsPanel({
   account,
   assets,
   onCreate,
   onDelete,
   busy
-}: {
-  account: string;
-  assets: Asset[];
-  onCreate: (payload: Omit<Asset, "id" | "created_at">) => void;
-  onDelete: (id: string) => void;
-  busy: boolean;
-}) {
+}: AssetsPanelProps) {
   const [symbol, setSymbol] = useState("");
   const [quantity, setQuantity] = useState(0);
   const [unit, setUnit] = useState("units");
@@ -34,15 +36,15 @@ export function AssetsPanel({
         <h2>Add asset</h2>
         <form className="stack" onSubmit={submit}>
           <label>
-            Ticker symbol
+            <span>Ticker symbol</span>
             <input required value={symbol} placeholder="BTC-USD" onChange={(event) => setSymbol(event.target.value)} />
           </label>
           <label>
-            Quantity
+            <span>Quantity</span>
             <input type="number" min="0" step="0.000001" value={quantity} onChange={(event) => setQuantity(Number(event.target.value))} />
           </label>
           <label>
-            Unit
+            <span>Unit</span>
             <select value={unit} onChange={(event) => setUnit(event.target.value)}>
               <option value="units">units</option>
               <option value="oz">oz (troy)</option>

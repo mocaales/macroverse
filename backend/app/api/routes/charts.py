@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg import Error as PsycopgError
 
 from app.api.dependencies import (
@@ -9,7 +9,6 @@ from app.api.dependencies import (
     get_market_repository,
     get_portfolio_repository,
 )
-from app.models.charts import ChartDefinition, ChartSeries
 from app.repositories.market import MarketRepository
 from app.repositories.portfolio import PortfolioRepository
 from app.services.market_data import FRED_SERIES, btc_prices, fred_series
@@ -103,7 +102,7 @@ CHARTS = [
 router = APIRouter(prefix="/charts", tags=["charts"])
 
 
-@router.get("", response_model=list[ChartDefinition])
+@router.get("")
 def charts() -> list[dict]:
     return [
         {
@@ -119,7 +118,7 @@ def charts() -> list[dict]:
     ]
 
 
-@router.get("/favourites", response_model=list[str])
+@router.get("/favourites")
 def favourites(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
@@ -127,7 +126,7 @@ def favourites(
     return repository.favourites(user.uid)
 
 
-@router.post("/favourites/{chart_name}", response_model=list[str])
+@router.post("/favourites/{chart_name}")
 def toggle_favourite(
     chart_name: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -136,7 +135,10 @@ def toggle_favourite(
     return repository.toggle_favourite(user.uid, chart_name)
 
 
-@router.get("/{slug}/series", response_model=list[ChartSeries])
+@router.get(
+    "/{slug}/series",
+    responses={status.HTTP_404_NOT_FOUND: {"description": "Chart data is not available."}},
+)
 def chart_series(
     slug: str,
     market_repository: Annotated[MarketRepository | None, Depends(get_market_repository)],

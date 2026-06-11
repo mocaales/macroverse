@@ -4,7 +4,11 @@ import { MetricStrip } from "../../components/MetricStrip";
 const money = (value: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
 
-export function RiskCalculator({ initialBalance }: { initialBalance: number }) {
+interface RiskCalculatorProps {
+  readonly initialBalance: number;
+}
+
+export function RiskCalculator({ initialBalance }: RiskCalculatorProps) {
   const [portfolio, setPortfolio] = useState(Math.max(initialBalance, 0));
   const [risk, setRisk] = useState(1);
   const [stop, setStop] = useState(2);
@@ -31,23 +35,23 @@ export function RiskCalculator({ initialBalance }: { initialBalance: number }) {
       </div>
       <div className="form-grid five">
         <label>
-          Portfolio
+          <span>Portfolio</span>
           <input type="number" min="0" value={portfolio} onChange={(event) => setPortfolio(Number(event.target.value))} />
         </label>
         <label>
-          Risk %
+          <span>Risk %</span>
           <input type="number" min="0.01" step="0.1" value={risk} onChange={(event) => setRisk(Number(event.target.value))} />
         </label>
         <label>
-          Stop %
+          <span>Stop %</span>
           <input type="number" min="0.01" step="0.1" value={stop} onChange={(event) => setStop(Number(event.target.value))} />
         </label>
         <label>
-          Leverage
+          <span>Leverage</span>
           <input type="number" min="1" value={leverage} onChange={(event) => setLeverage(Number(event.target.value))} />
         </label>
         <label>
-          Reward ratio
+          <span>Reward ratio</span>
           <input type="number" min="0.1" step="0.1" value={reward} onChange={(event) => setReward(Number(event.target.value))} />
         </label>
       </div>

@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import pytest
+
 from app.repositories.market import MarketObservation, MarketRepository
 
 
@@ -32,7 +34,7 @@ class FakeConnection:
     def __exit__(self, *args):
         return None
 
-    def cursor(self) -> FakeCursor:
+    def cursor(self, **_kwargs) -> FakeCursor:
         return self._cursor
 
     def commit(self) -> None:
@@ -64,7 +66,7 @@ class RecordingCursor(FakeCursor):
         super().__init__(None)
         self.queries: list[str] = []
 
-    def execute(self, query: str, parameters) -> None:
+    def execute(self, query: str, parameters=None) -> None:
         self.queries.append(query)
 
 
@@ -88,3 +90,37 @@ def test_observation_upserts_use_small_committed_batches_without_pipeline():
     assert count == 5
     assert len(insert_queries) == 3
     assert pool._connection.commits == 3
+
+
+def test_series_queries_health_and_validation():
+    cursor = RecordingCursor()
+    cursor.fetchall = lambda: [{"observed_at": datetime(2026, 1, 1, tzinfo=UTC), "value": 1}]
+    cursor.fetchone = lambda: (1,)
+    pool = FakePool(cursor)
+    repository = MarketRepository(pool)
+    repository.upsert_series(
+        series_id="fred:DGS10",
+        provider="fred",
+        name="10 Year",
+        symbol="DGS10",
+        interval="1d",
+        unit="percent",
+    )
+    rows = repository.read_series(
+        "fred:DGS10",
+        start=datetime(2026, 1, 1, tzinfo=UTC),
+        end=datetime(2026, 1, 2, tzinfo=UTC),
+    )
+    assert rows[0]["value"] == 1
+    assert repository.healthcheck() is True
+    assert repository.upsert_observations([]) == 0
+
+    with pytest.raises(ValueError):
+        MarketRepository(pool, batch_size=0)
+    with pytest.raises(ValueError):
+        repository.upsert_observations(
+            [
+                MarketObservation("one", datetime.now(UTC), "x"),
+                MarketObservation("two", datetime.now(UTC), "x"),
+            ]
+        )
