@@ -9,7 +9,7 @@ def test_routine_sync_uses_recent_provider_window():
     start = _sync_start(full=False)
 
     assert start is not None
-    assert 13 <= (datetime.now(UTC) - start).days <= 14
+    assert 6 <= (datetime.now(UTC) - start).days <= 7
 
 
 def test_full_sync_requests_complete_provider_history():

@@ -16,7 +16,7 @@ BTC_SERIES_ID = "coinmetrics:btc:PriceUSD:1d"
 
 
 def _sync_start(full: bool) -> datetime | None:
-    return None if full else datetime.now(UTC) - timedelta(days=14)
+    return None if full else datetime.now(UTC) - timedelta(days=7)
 
 
 def _observations(series_id: str, provider: str, frame: pd.DataFrame) -> list[MarketObservation]:
