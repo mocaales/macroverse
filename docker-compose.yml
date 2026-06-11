@@ -1,0 +1,77 @@
+name: macroverse
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_FIREBASE_API_KEY: "${VITE_FIREBASE_API_KEY}"
+        VITE_FIREBASE_AUTH_DOMAIN: "${VITE_FIREBASE_AUTH_DOMAIN}"
+        VITE_FIREBASE_PROJECT_ID: "${VITE_FIREBASE_PROJECT_ID}"
+        VITE_FIREBASE_STORAGE_BUCKET: "${VITE_FIREBASE_STORAGE_BUCKET}"
+        VITE_FIREBASE_MESSAGING_SENDER_ID: "${VITE_FIREBASE_MESSAGING_SENDER_ID}"
+        VITE_FIREBASE_APP_ID: "${VITE_FIREBASE_APP_ID}"
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    environment:
+      ENVIRONMENT: production
+      CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-8080}"
+      FIREBASE_PROJECT_ID: "${VITE_FIREBASE_PROJECT_ID}"
+      FIREBASE_SERVICE_ACCOUNT_BASE64: "${FIREBASE_SERVICE_ACCOUNT_BASE64}"
+      MARKET_DATABASE_URL: "${MARKET_DATABASE_URL:-postgresql://macroverse:macroverse@timescaledb:5432/macroverse}"
+      COINMETRICS_API_BASE_URL: "${COINMETRICS_API_BASE_URL:-https://community-api.coinmetrics.io/v4}"
+      FRED_API_KEY: "${FRED_API_KEY:-}"
+      CRYPTOQUANT_ACCESS_TOKEN: "${CRYPTOQUANT_ACCESS_TOKEN:-}"
+      CRYPTOQUANT_SERIES_JSON: "${CRYPTOQUANT_SERIES_JSON:-[]}"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  market-sync:
+    build:
+      context: ./backend
+    command: ["python", "-m", "app.worker"]
+    healthcheck:
+      disable: true
+    environment:
+      MARKET_DATABASE_URL: "${MARKET_DATABASE_URL:-postgresql://macroverse:macroverse@timescaledb:5432/macroverse}"
+      MARKET_SYNC_INTERVAL_SECONDS: "${MARKET_SYNC_INTERVAL_SECONDS:-3600}"
+      COINMETRICS_API_BASE_URL: "${COINMETRICS_API_BASE_URL:-https://community-api.coinmetrics.io/v4}"
+      FRED_API_KEY: "${FRED_API_KEY:-}"
+      CRYPTOQUANT_ACCESS_TOKEN: "${CRYPTOQUANT_ACCESS_TOKEN:-}"
+      CRYPTOQUANT_SERIES_JSON: "${CRYPTOQUANT_SERIES_JSON:-[]}"
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg17
+    environment:
+      POSTGRES_DB: macroverse
+      POSTGRES_USER: macroverse
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:-macroverse}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U macroverse -d macroverse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  timescale_data:

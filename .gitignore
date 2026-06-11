@@ -1,2 +1,61 @@
-.env*
+# OS files
 .DS_Store
+Thumbs.db
+
+# Local environment and credentials
+.env
+.env.local
+.env.*.local
+!.env.example
+firebase-service-account*.json
+service-account*.json
+*serviceAccount*.json
+application_default_credentials.json
+backend/.env
+frontend/.env
+
+# Firebase CLI local state and logs
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Python caches, environments, and build output
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.venv/
+venv/
+env/
+*.egg-info/
+build/
+dist/
+
+# Frontend dependencies, builds, and tool caches
+frontend/node_modules/
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/.vite/
+frontend/coverage/
+.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
