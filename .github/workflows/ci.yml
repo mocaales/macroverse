@@ -55,6 +55,9 @@ jobs:
       - name: Test
         working-directory: backend
         run: pytest
+      - name: Normalize backend coverage paths
+        working-directory: backend
+        run: python scripts/normalize_coverage.py coverage.xml --source backend
       - name: Upload backend coverage
         uses: actions/upload-artifact@v4
         with:

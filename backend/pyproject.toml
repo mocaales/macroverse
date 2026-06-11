@@ -34,7 +34,7 @@ include = ["app*"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = [
-  "--cov=app",
+  "--cov=.",
   "--cov-branch",
   "--cov-report=term-missing",
   "--cov-report=xml:coverage.xml",
@@ -43,8 +43,12 @@ addopts = [
 
 [tool.coverage.run]
 relative_files = true
-source = ["app"]
+source = ["."]
 branch = true
+omit = [
+  "tests/*",
+  "legacy_streamlit/*",
+]
 
 [tool.coverage.report]
 skip_empty = true

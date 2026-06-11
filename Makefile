@@ -34,6 +34,7 @@ test:
 
 coverage:
 	cd backend && .venv/bin/pytest
+	cd backend && .venv/bin/python scripts/normalize_coverage.py coverage.xml --source backend
 	cd frontend && npm run test:coverage
 
 build:

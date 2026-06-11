@@ -1,6 +1,8 @@
 import argparse
 from pathlib import Path
 
+from psycopg import sql
+
 from app.core.config import get_settings
 from app.core.market_database import get_market_pool
 from app.repositories.market import MarketRepository
@@ -31,7 +33,7 @@ def migrate() -> None:
         for migration in sorted(migration_dir.glob("*.sql")):
             if migration.name in applied:
                 continue
-            cursor.execute(migration.read_text(encoding="utf-8"))
+            cursor.execute(sql.SQL(migration.read_text(encoding="utf-8")))
             cursor.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (migration.name,))
         connection.commit()
 
