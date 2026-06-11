@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from app.repositories.market import MarketRepository
+from app.repositories.market import MarketObservation, MarketRepository
 
 
 class FakeCursor:
@@ -24,6 +24,7 @@ class FakeCursor:
 class FakeConnection:
     def __init__(self, cursor: FakeCursor) -> None:
         self._cursor = cursor
+        self.commits = 0
 
     def __enter__(self):
         return self
@@ -33,6 +34,9 @@ class FakeConnection:
 
     def cursor(self) -> FakeCursor:
         return self._cursor
+
+    def commit(self) -> None:
+        self.commits += 1
 
 
 class FakePool:
@@ -53,3 +57,34 @@ def test_latest_observation_cursor_reads_series_metadata_only():
     assert result == latest
     assert "market_series" in cursor.query
     assert "market_observations" not in cursor.query
+
+
+class RecordingCursor(FakeCursor):
+    def __init__(self) -> None:
+        super().__init__(None)
+        self.queries: list[str] = []
+
+    def execute(self, query: str, parameters) -> None:
+        self.queries.append(query)
+
+
+def test_observation_upserts_use_small_committed_batches_without_pipeline():
+    cursor = RecordingCursor()
+    pool = FakePool(cursor)
+    repository = MarketRepository(pool, batch_size=2)
+    observations = [
+        MarketObservation(
+            series_id="fred:DGS10",
+            observed_at=datetime(2026, 6, day, tzinfo=UTC),
+            provider="fred",
+            value=float(day),
+        )
+        for day in range(1, 6)
+    ]
+
+    count = repository.upsert_observations(observations)
+
+    insert_queries = [query for query in cursor.queries if "INSERT INTO market_observations" in query]
+    assert count == 5
+    assert len(insert_queries) == 3
+    assert pool._connection.commits == 3

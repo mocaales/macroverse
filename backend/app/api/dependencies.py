@@ -7,6 +7,7 @@ from firebase_admin.exceptions import FirebaseError
 from google.cloud.firestore_v1 import Client
 from pydantic import BaseModel, EmailStr
 
+from app.core.config import get_settings
 from app.core.firebase import get_firebase_app, get_firestore_client
 from app.core.market_database import get_market_pool
 from app.repositories.market import MarketRepository
@@ -30,7 +31,7 @@ def get_portfolio_repository(db: Annotated[Client, Depends(get_db)]) -> Portfoli
 
 def get_market_repository() -> MarketRepository | None:
     pool = get_market_pool()
-    return MarketRepository(pool) if pool else None
+    return MarketRepository(pool, batch_size=get_settings().market_database_batch_size) if pool else None
 
 
 def get_current_user(

@@ -289,6 +289,8 @@ market_observations           TimescaleDB hypertable
 ```
 
 Each synchronization overlaps the previous seven days and uses an upsert. This captures provider corrections without creating duplicate observations.
+Writes are committed in small batches so initial history imports remain within low-memory database service limits and can resume after interruption.
+The optional GitHub repository variable `MARKET_DATABASE_BATCH_SIZE` controls this size and defaults to `25`.
 
 ## Existing MongoDB Data
 

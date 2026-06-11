@@ -21,8 +21,11 @@ class MarketObservation:
 
 
 class MarketRepository:
-    def __init__(self, pool: ConnectionPool) -> None:
+    def __init__(self, pool: ConnectionPool, *, batch_size: int = 25) -> None:
+        if batch_size < 1:
+            raise ValueError("batch_size must be at least 1")
         self.pool = pool
+        self.batch_size = batch_size
 
     def upsert_series(
         self,
@@ -72,41 +75,49 @@ class MarketRepository:
         ]
         if not rows:
             return 0
-        latest_observed_at = max(row[1] for row in rows)
-        series_id = rows[0][0]
+        series_ids = {row[0] for row in rows}
+        if len(series_ids) != 1:
+            raise ValueError("All observations in a batch must belong to the same series")
+        rows.sort(key=lambda row: row[1])
         with self.pool.connection() as connection, connection.cursor() as cursor:
-            cursor.executemany(
-                """
-                INSERT INTO market_observations (
-                    series_id, observed_at, provider, value, open, high, low, close, volume
+            for offset in range(0, len(rows), self.batch_size):
+                batch = rows[offset : offset + self.batch_size]
+                placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s, %s, %s)"] * len(batch))
+                parameters = [value for row in batch for value in row]
+                cursor.execute(
+                    f"""
+                    INSERT INTO market_observations (
+                        series_id, observed_at, provider, value, open, high, low, close, volume
+                    )
+                    VALUES {placeholders}
+                    ON CONFLICT (series_id, observed_at) DO UPDATE SET
+                        provider = EXCLUDED.provider,
+                        value = EXCLUDED.value,
+                        open = EXCLUDED.open,
+                        high = EXCLUDED.high,
+                        low = EXCLUDED.low,
+                        close = EXCLUDED.close,
+                        volume = EXCLUDED.volume,
+                        ingested_at = now()
+                    """,
+                    parameters,
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (series_id, observed_at) DO UPDATE SET
-                    provider = EXCLUDED.provider,
-                    value = EXCLUDED.value,
-                    open = EXCLUDED.open,
-                    high = EXCLUDED.high,
-                    low = EXCLUDED.low,
-                    close = EXCLUDED.close,
-                    volume = EXCLUDED.volume,
-                    ingested_at = now()
-                """,
-                rows,
-            )
-            cursor.execute(
-                """
-                UPDATE market_series
-                SET latest_observed_at = GREATEST(
-                        COALESCE(latest_observed_at, %s),
-                        %s
-                    ),
-                    last_synced_at = now(),
-                    updated_at = now()
-                WHERE series_id = %s
-                """,
-                (latest_observed_at, latest_observed_at, series_id),
-            )
-            connection.commit()
+                latest_observed_at = batch[-1][1]
+                series_id = batch[0][0]
+                cursor.execute(
+                    """
+                    UPDATE market_series
+                    SET latest_observed_at = GREATEST(
+                            COALESCE(latest_observed_at, %s),
+                            %s
+                        ),
+                        last_synced_at = now(),
+                        updated_at = now()
+                    WHERE series_id = %s
+                    """,
+                    (latest_observed_at, latest_observed_at, series_id),
+                )
+                connection.commit()
         return len(rows)
 
     def read_series(

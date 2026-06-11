@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     market_database_url: str = ""
     market_database_pool_min_size: int = 1
     market_database_pool_max_size: int = 5
+    market_database_batch_size: int = 25
     coinmetrics_api_base_url: str = "https://community-api.coinmetrics.io/v4"
     fred_api_key: str = ""
     cryptoquant_access_token: str = ""

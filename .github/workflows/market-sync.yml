@@ -12,7 +12,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +32,7 @@ jobs:
         working-directory: backend
         env:
           MARKET_DATABASE_URL: ${{ secrets.MARKET_DATABASE_URL }}
+          MARKET_DATABASE_BATCH_SIZE: ${{ vars.MARKET_DATABASE_BATCH_SIZE || '25' }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           CRYPTOQUANT_ACCESS_TOKEN: ${{ secrets.CRYPTOQUANT_ACCESS_TOKEN }}
           CRYPTOQUANT_SERIES_JSON: ${{ secrets.CRYPTOQUANT_SERIES_JSON }}

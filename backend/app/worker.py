@@ -3,6 +3,7 @@ import os
 import time
 
 from app.cli import migrate
+from app.core.config import get_settings
 from app.core.market_database import get_market_pool
 from app.repositories.market import MarketRepository
 from app.services.market_sync import sync_bitcoin, sync_configured_cryptoquant, sync_fred
@@ -17,7 +18,7 @@ def main() -> None:
     pool = get_market_pool()
     if pool is None:
         raise RuntimeError("MARKET_DATABASE_URL is not configured.")
-    repository = MarketRepository(pool)
+    repository = MarketRepository(pool, batch_size=get_settings().market_database_batch_size)
     while True:
         started = time.monotonic()
         for name, sync in (
