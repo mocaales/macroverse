@@ -23,7 +23,7 @@ services:
       context: ./backend
     environment:
       ENVIRONMENT: production
-      CORS_ORIGINS: "http://localhost:${FRONTEND_PORT:-8080}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
       FIREBASE_PROJECT_ID: "${VITE_FIREBASE_PROJECT_ID}"
       FIREBASE_SERVICE_ACCOUNT_BASE64: "${FIREBASE_SERVICE_ACCOUNT_BASE64}"
       MARKET_DATABASE_URL: "${MARKET_DATABASE_URL}"

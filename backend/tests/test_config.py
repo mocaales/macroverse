@@ -53,3 +53,17 @@ def test_incomplete_database_environment_disables_pool():
     settings = Settings(_env_file=None, postgres_host=secrets.token_hex(8))
 
     assert settings.market_database_conninfo == ""
+
+
+def test_cors_is_closed_by_default_and_parses_configured_origins():
+    assert Settings(_env_file=None).cors_origin_list == []
+
+    settings = Settings(
+        _env_file=None,
+        cors_origins="https://app.example.com, https://admin.example.com,",
+    )
+
+    assert settings.cors_origin_list == [
+        "https://app.example.com",
+        "https://admin.example.com",
+    ]

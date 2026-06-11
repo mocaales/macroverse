@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Macroverse API"
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
-    cors_origins: str = "http://localhost:5173,http://localhost:8080"
+    cors_origins: str = ""
     firebase_project_id: str = ""
     firebase_service_account_base64: str = ""
     market_database_url: str = ""
