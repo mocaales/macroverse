@@ -14,22 +14,33 @@ jobs:
   backend:
     name: Backend quality
     runs-on: ubuntu-latest
-    services:
-      timescaledb:
-        image: timescale/timescaledb:latest-pg17
-        env:
-          POSTGRES_DB: macroverse
-          POSTGRES_USER: macroverse
-          POSTGRES_PASSWORD: macroverse
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U macroverse -d macroverse"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
     steps:
       - uses: actions/checkout@v4
+      - name: Create CI environment
+        env:
+          POSTGRES_HOST: ${{ secrets.CI_POSTGRES_HOST }}
+          POSTGRES_DB: ${{ secrets.CI_POSTGRES_DB }}
+          POSTGRES_USER: ${{ secrets.CI_POSTGRES_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.CI_POSTGRES_PASSWORD }}
+          POSTGRES_PORT: ${{ secrets.CI_POSTGRES_PORT }}
+        run: |
+          umask 077
+          for variable in POSTGRES_HOST POSTGRES_DB POSTGRES_USER POSTGRES_PASSWORD POSTGRES_PORT; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Required CI database secret is missing: ${variable}"
+              exit 1
+            fi
+          done
+          {
+            printf 'POSTGRES_HOST=%s\n' "$POSTGRES_HOST"
+            printf 'POSTGRES_DB=%s\n' "$POSTGRES_DB"
+            printf 'POSTGRES_USER=%s\n' "$POSTGRES_USER"
+            printf 'POSTGRES_PASSWORD=%s\n' "$POSTGRES_PASSWORD"
+            printf 'POSTGRES_PORT=%s\n' "$POSTGRES_PORT"
+          } > .env.ci
+          cp .env.ci backend/.env
+      - name: Start CI TimescaleDB
+        run: docker compose --env-file .env.ci up -d --wait timescaledb
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
@@ -52,9 +63,10 @@ jobs:
           retention-days: 7
       - name: Apply TimescaleDB migrations
         working-directory: backend
-        env:
-          MARKET_DATABASE_URL: postgresql://macroverse:macroverse@localhost:5432/macroverse
         run: python -m app.cli migrate
+      - name: Remove CI environment
+        if: ${{ always() }}
+        run: rm -f .env.ci backend/.env
 
   frontend:
     name: Frontend quality

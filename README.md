@@ -164,7 +164,13 @@ cp frontend/.env.example frontend/.env
 cp backend/.env.example backend/.env
 ```
 
-2. Fill in the Firebase variables and `FRED_API_KEY`. Keep the default local database values.
+2. Fill in the Firebase variables and `FRED_API_KEY`. Set every `POSTGRES_*` field in the root `.env`. Generate the password locally:
+
+```bash
+openssl rand -base64 32
+```
+
+Store the generated value as `POSTGRES_PASSWORD`. Set the database host, port, database name, and username in the same ignored file. Leave `MARKET_DATABASE_URL` empty for local Docker because the backend constructs its connection from those separate fields.
 
 3. Start the complete stack:
 
@@ -201,20 +207,20 @@ Tiger Cloud is the managed TimescaleDB option. It avoids operating database back
 5. Open the service and select **Connect**.
 6. Copy the PostgreSQL connection string and store the generated password securely.
 
-The connection string should resemble:
+Store the connection string supplied by Tiger Cloud:
 
 ```dotenv
-MARKET_DATABASE_URL=postgres://tsdbadmin:password@host:port/tsdb?sslmode=require
+MARKET_DATABASE_URL=<Tiger Cloud connection string>
 ```
 
 Do not commit this value. Add it to the production backend's secret environment variables.
 
-Apply the schema and load the initial data:
+Apply the schema and load the initial data after exporting the production environment:
 
 ```bash
 cd backend
-MARKET_DATABASE_URL='postgres://...' .venv/bin/python -m app.cli migrate
-MARKET_DATABASE_URL='postgres://...' FRED_API_KEY='...' .venv/bin/python -m app.cli sync-all
+.venv/bin/python -m app.cli migrate
+.venv/bin/python -m app.cli sync-all
 ```
 
 For production, run the `market-sync` container continuously next to the backend. The scheduled GitHub workflow is also provided as a recovery mechanism, but GitHub scheduled jobs can be delayed and should not be the only scheduler for strict freshness requirements.
@@ -226,6 +232,11 @@ In GitHub, open **Settings > Secrets and variables > Actions > New repository se
 | Secret | Purpose |
 | --- | --- |
 | `MARKET_DATABASE_URL` | Tiger Cloud PostgreSQL URL with `sslmode=require` |
+| `CI_POSTGRES_HOST` | Host used by the isolated CI database |
+| `CI_POSTGRES_PORT` | Port used by the isolated CI database |
+| `CI_POSTGRES_DB` | Database name used by CI |
+| `CI_POSTGRES_USER` | Database user used by CI |
+| `CI_POSTGRES_PASSWORD` | Database password used by CI |
 | `FRED_API_KEY` | FRED API key |
 | `CRYPTOQUANT_ACCESS_TOKEN` | CryptoQuant API token, when used |
 | `CRYPTOQUANT_SERIES_JSON` | JSON configuration for CryptoQuant series |

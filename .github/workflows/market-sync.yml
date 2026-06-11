@@ -29,13 +29,7 @@ jobs:
       - name: Install backend
         working-directory: backend
         run: pip install .
-      - name: Apply market database migrations
-        working-directory: backend
-        env:
-          MARKET_DATABASE_URL: ${{ secrets.MARKET_DATABASE_URL }}
-        run: python -m app.cli migrate
-      - name: Synchronize market data
-        working-directory: backend
+      - name: Create market sync environment
         env:
           MARKET_DATABASE_URL: ${{ secrets.MARKET_DATABASE_URL }}
           MARKET_DATABASE_BATCH_SIZE: ${{ vars.MARKET_DATABASE_BATCH_SIZE || '25' }}
@@ -43,8 +37,25 @@ jobs:
           CRYPTOQUANT_ACCESS_TOKEN: ${{ secrets.CRYPTOQUANT_ACCESS_TOKEN }}
           CRYPTOQUANT_SERIES_JSON: ${{ secrets.CRYPTOQUANT_SERIES_JSON }}
         run: |
+          umask 077
+          {
+            printf 'MARKET_DATABASE_URL=%s\n' "$MARKET_DATABASE_URL"
+            printf 'MARKET_DATABASE_BATCH_SIZE=%s\n' "$MARKET_DATABASE_BATCH_SIZE"
+            printf 'FRED_API_KEY=%s\n' "$FRED_API_KEY"
+            printf 'CRYPTOQUANT_ACCESS_TOKEN=%s\n' "$CRYPTOQUANT_ACCESS_TOKEN"
+            printf 'CRYPTOQUANT_SERIES_JSON=%s\n' "$CRYPTOQUANT_SERIES_JSON"
+          } > backend/.env
+      - name: Apply market database migrations
+        working-directory: backend
+        run: python -m app.cli migrate
+      - name: Synchronize market data
+        working-directory: backend
+        run: |
           if [[ "${{ inputs.full_backfill }}" == "true" ]]; then
             python -m app.cli sync-all --full
           else
             python -m app.cli sync-all
           fi
+      - name: Remove market sync environment
+        if: ${{ always() }}
+        run: rm -f backend/.env

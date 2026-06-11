@@ -8,10 +8,11 @@ from app.core.config import get_settings
 @lru_cache
 def get_market_pool() -> ConnectionPool | None:
     settings = get_settings()
-    if not settings.market_database_url:
+    conninfo = settings.market_database_conninfo
+    if not conninfo:
         return None
     return ConnectionPool(
-        conninfo=settings.market_database_url,
+        conninfo=conninfo,
         min_size=settings.market_database_pool_min_size,
         max_size=settings.market_database_pool_max_size,
         open=True,

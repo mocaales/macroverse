@@ -5,6 +5,7 @@ Thumbs.db
 # Local environment and credentials
 .env
 .env.local
+.env.ci
 .env.*.local
 !.env.example
 firebase-service-account*.json

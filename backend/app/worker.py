@@ -17,7 +17,7 @@ def main() -> None:
     migrate()
     pool = get_market_pool()
     if pool is None:
-        raise RuntimeError("MARKET_DATABASE_URL is not configured.")
+        raise RuntimeError("Market database environment is not configured.")
     repository = MarketRepository(pool, batch_size=get_settings().market_database_batch_size)
     while True:
         started = time.monotonic()

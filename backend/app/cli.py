@@ -15,7 +15,7 @@ from app.services.market_sync import (
 def migrate() -> None:
     pool = get_market_pool()
     if pool is None:
-        raise RuntimeError("MARKET_DATABASE_URL is not configured.")
+        raise RuntimeError("Market database environment is not configured.")
     migration_dir = Path(__file__).resolve().parents[1] / "migrations"
     with pool.connection() as connection, connection.cursor() as cursor:
         cursor.execute(
@@ -68,7 +68,7 @@ def main() -> None:
         return
     pool = get_market_pool()
     if pool is None:
-        raise RuntimeError("MARKET_DATABASE_URL is not configured.")
+        raise RuntimeError("Market database environment is not configured.")
     repository = MarketRepository(pool, batch_size=get_settings().market_database_batch_size)
     try:
         if args.command == "sync-fred":
