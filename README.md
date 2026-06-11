@@ -277,7 +277,8 @@ market_series
 ├── provider                  fred, coinmetrics, or cryptoquant
 ├── name, symbol, interval
 ├── unit and metadata
-└── last_synced_at
+├── last_synced_at
+└── latest_observed_at         incremental ingestion cursor
 
 market_observations           TimescaleDB hypertable
 ├── series_id + observed_at   primary key

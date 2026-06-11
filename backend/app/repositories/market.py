@@ -39,9 +39,9 @@ class MarketRepository:
             cursor.execute(
                 """
                 INSERT INTO market_series (
-                    series_id, provider, name, symbol, interval, unit, metadata, last_synced_at
+                    series_id, provider, name, symbol, interval, unit, metadata
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, now())
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (series_id) DO UPDATE SET
                     provider = EXCLUDED.provider,
                     name = EXCLUDED.name,
@@ -49,7 +49,6 @@ class MarketRepository:
                     interval = EXCLUDED.interval,
                     unit = EXCLUDED.unit,
                     metadata = market_series.metadata || EXCLUDED.metadata,
-                    last_synced_at = now(),
                     updated_at = now()
                 """,
                 (series_id, provider, name, symbol, interval, unit, Jsonb(metadata or {})),
@@ -73,6 +72,8 @@ class MarketRepository:
         ]
         if not rows:
             return 0
+        latest_observed_at = max(row[1] for row in rows)
+        series_id = rows[0][0]
         with self.pool.connection() as connection, connection.cursor() as cursor:
             cursor.executemany(
                 """
@@ -91,6 +92,19 @@ class MarketRepository:
                     ingested_at = now()
                 """,
                 rows,
+            )
+            cursor.execute(
+                """
+                UPDATE market_series
+                SET latest_observed_at = GREATEST(
+                        COALESCE(latest_observed_at, %s),
+                        %s
+                    ),
+                    last_synced_at = now(),
+                    updated_at = now()
+                WHERE series_id = %s
+                """,
+                (latest_observed_at, latest_observed_at, series_id),
             )
             connection.commit()
         return len(rows)
@@ -128,7 +142,7 @@ class MarketRepository:
     def latest_observation_at(self, series_id: str) -> datetime | None:
         with self.pool.connection() as connection, connection.cursor() as cursor:
             cursor.execute(
-                "SELECT max(observed_at) FROM market_observations WHERE series_id = %s",
+                "SELECT latest_observed_at FROM market_series WHERE series_id = %s",
                 (series_id,),
             )
             row = cursor.fetchone()
