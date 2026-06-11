@@ -4,6 +4,12 @@ on:
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
+    inputs:
+      full_backfill:
+        description: Load complete provider history instead of the recent update window
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: market-data-sync
@@ -36,4 +42,9 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           CRYPTOQUANT_ACCESS_TOKEN: ${{ secrets.CRYPTOQUANT_ACCESS_TOKEN }}
           CRYPTOQUANT_SERIES_JSON: ${{ secrets.CRYPTOQUANT_SERIES_JSON }}
-        run: python -m app.cli sync-all
+        run: |
+          if [[ "${{ inputs.full_backfill }}" == "true" ]]; then
+            python -m app.cli sync-all --full
+          else
+            python -m app.cli sync-all
+          fi

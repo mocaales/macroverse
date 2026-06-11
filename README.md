@@ -288,9 +288,11 @@ market_observations           TimescaleDB hypertable
 └── ingested_at
 ```
 
-Each synchronization overlaps the previous seven days and uses an upsert. This captures provider corrections without creating duplicate observations.
+Routine synchronization requests the most recent 14 days and uses an upsert. This captures provider corrections without creating duplicate observations or querying the database for a cursor.
 Writes are committed in small batches so initial history imports remain within low-memory database service limits and can resume after interruption.
 The optional GitHub repository variable `MARKET_DATABASE_BATCH_SIZE` controls this size and defaults to `25`.
+
+Use `python -m app.cli sync-all --full` only for the initial historical backfill. In GitHub Actions, manually run **Market data sync** with **Load complete provider history** enabled. Scheduled runs always use the recent update window.
 
 ## Existing MongoDB Data
 

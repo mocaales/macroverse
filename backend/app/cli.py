@@ -42,8 +42,14 @@ def main() -> None:
     subcommands.add_parser("migrate", help="Apply TimescaleDB schema migrations")
     sync_fred_parser = subcommands.add_parser("sync-fred", help="Synchronize FRED series")
     sync_fred_parser.add_argument("series", nargs="*", help="Optional FRED series IDs")
-    subcommands.add_parser("sync-bitcoin", help="Synchronize daily Bitcoin/USD history")
-    subcommands.add_parser("sync-all", help="Synchronize FRED, Bitcoin, and configured CryptoQuant series")
+    sync_fred_parser.add_argument("--full", action="store_true", help="Load complete provider history")
+    sync_bitcoin_parser = subcommands.add_parser("sync-bitcoin", help="Synchronize daily Bitcoin/USD history")
+    sync_bitcoin_parser.add_argument("--full", action="store_true", help="Load complete provider history")
+    sync_all_parser = subcommands.add_parser(
+        "sync-all",
+        help="Synchronize FRED, Bitcoin, and configured CryptoQuant series",
+    )
+    sync_all_parser.add_argument("--full", action="store_true", help="Load complete provider history")
     cryptoquant = subcommands.add_parser("sync-cryptoquant", help="Synchronize one CryptoQuant series")
     cryptoquant.add_argument("--series-id", required=True)
     cryptoquant.add_argument("--endpoint", required=True)
@@ -66,15 +72,15 @@ def main() -> None:
     repository = MarketRepository(pool, batch_size=get_settings().market_database_batch_size)
     try:
         if args.command == "sync-fred":
-            print(sync_fred(repository, args.series or None))
+            print(sync_fred(repository, args.series or None, full=args.full))
         elif args.command == "sync-bitcoin":
-            print(sync_bitcoin(repository))
+            print(sync_bitcoin(repository, full=args.full))
         elif args.command == "sync-all":
             print(
                 {
-                    **sync_bitcoin(repository),
-                    **sync_fred(repository),
-                    **sync_configured_cryptoquant(repository),
+                    **sync_bitcoin(repository, full=args.full),
+                    **sync_fred(repository, full=args.full),
+                    **sync_configured_cryptoquant(repository, full=args.full),
                 }
             )
         elif args.command == "sync-cryptoquant":

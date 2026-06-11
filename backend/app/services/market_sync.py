@@ -1,5 +1,5 @@
 import json
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
@@ -15,9 +15,8 @@ from app.services.market_data import (
 BTC_SERIES_ID = "coinmetrics:btc:PriceUSD:1d"
 
 
-def _incremental_start(repository: MarketRepository, series_id: str):
-    latest = repository.latest_observation_at(series_id)
-    return latest - timedelta(days=7) if latest else None
+def _sync_start(full: bool) -> datetime | None:
+    return None if full else datetime.now(UTC) - timedelta(days=14)
 
 
 def _observations(series_id: str, provider: str, frame: pd.DataFrame) -> list[MarketObservation]:
@@ -32,13 +31,18 @@ def _observations(series_id: str, provider: str, frame: pd.DataFrame) -> list[Ma
     ]
 
 
-def sync_fred(repository: MarketRepository, series_ids: list[str] | None = None) -> dict[str, int]:
+def sync_fred(
+    repository: MarketRepository,
+    series_ids: list[str] | None = None,
+    *,
+    full: bool = False,
+) -> dict[str, int]:
     selected = series_ids or list(FRED_SERIES.values())
     names = {series_id: name for name, series_id in FRED_SERIES.items()}
     results = {}
     for fred_id in selected:
         series_id = f"fred:{fred_id}"
-        frame = fetch_fred_series(fred_id, _incremental_start(repository, series_id))
+        frame = fetch_fred_series(fred_id, _sync_start(full))
         repository.upsert_series(
             series_id=series_id,
             provider="fred",
@@ -52,8 +56,8 @@ def sync_fred(repository: MarketRepository, series_ids: list[str] | None = None)
     return results
 
 
-def sync_bitcoin(repository: MarketRepository) -> dict[str, int]:
-    frame = fetch_btc_prices(_incremental_start(repository, BTC_SERIES_ID))
+def sync_bitcoin(repository: MarketRepository, *, full: bool = False) -> dict[str, int]:
+    frame = fetch_btc_prices(_sync_start(full))
     repository.upsert_series(
         series_id=BTC_SERIES_ID,
         provider="coinmetrics",
@@ -76,11 +80,12 @@ def sync_cryptoquant(
     name: str,
     unit: str | None,
     window: str,
+    full: bool = False,
 ) -> dict[str, int]:
     frame = fetch_cryptoquant_series(
         endpoint,
         value_key,
-        start=_incremental_start(repository, series_id),
+        start=_sync_start(full),
         window=window,
     )
     repository.upsert_series(
@@ -96,7 +101,7 @@ def sync_cryptoquant(
     return {series_id: count}
 
 
-def sync_configured_cryptoquant(repository: MarketRepository) -> dict[str, int]:
+def sync_configured_cryptoquant(repository: MarketRepository, *, full: bool = False) -> dict[str, int]:
     configured = json.loads(get_settings().cryptoquant_series_json or "[]")
     results = {}
     for item in configured:
@@ -109,6 +114,7 @@ def sync_configured_cryptoquant(repository: MarketRepository) -> dict[str, int]:
                 name=item.get("name", item["series_id"]),
                 unit=item.get("unit"),
                 window=item.get("window", "day"),
+                full=full,
             )
         )
     return results

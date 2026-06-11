@@ -1,28 +1,19 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import pandas as pd
 
-from app.services.market_sync import _incremental_start, _observations
+from app.services.market_sync import _observations, _sync_start
 
 
-class FakeMarketRepository:
-    def __init__(self, latest: datetime | None) -> None:
-        self.latest = latest
+def test_routine_sync_uses_recent_provider_window():
+    start = _sync_start(full=False)
 
-    def latest_observation_at(self, series_id: str) -> datetime | None:
-        return self.latest
-
-
-def test_incremental_start_overlaps_last_seven_days():
-    latest = datetime(2026, 6, 11, tzinfo=UTC)
-
-    start = _incremental_start(FakeMarketRepository(latest), "fred:DGS10")
-
-    assert start == latest - timedelta(days=7)
+    assert start is not None
+    assert 13 <= (datetime.now(UTC) - start).days <= 14
 
 
-def test_incremental_start_is_none_for_an_empty_series():
-    assert _incremental_start(FakeMarketRepository(None), "fred:DGS10") is None
+def test_full_sync_requests_complete_provider_history():
+    assert _sync_start(full=True) is None
 
 
 def test_observations_convert_dataframe_rows():
