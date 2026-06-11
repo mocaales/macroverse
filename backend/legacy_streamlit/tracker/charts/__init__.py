@@ -1,0 +1,1 @@
+"""Chart modules and registry."""
