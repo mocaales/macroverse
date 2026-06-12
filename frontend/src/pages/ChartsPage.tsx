@@ -4,22 +4,9 @@ import { ArrowLeft, Search, Star } from "lucide-react";
 import { chartsApi } from "../api/queries";
 import { EmptyState } from "../components/EmptyState";
 import { Plot } from "../components/Plot";
+import { YearToDateRoiChart } from "../components/YearToDateRoiChart";
 import { useAuth } from "../features/auth/AuthProvider";
 import type { ChartDefinition, ChartSeries } from "../types";
-
-function transformSeries(chart: ChartDefinition, series: ChartSeries[]) {
-  if (chart.slug !== "year_to_date_roi") return series;
-  const rows = series[0]?.points || [];
-  const years = new Map<string, typeof rows>();
-  rows.forEach((point) => {
-    const year = point.date.slice(0, 4);
-    years.set(year, [...(years.get(year) || []), point]);
-  });
-  return [...years.entries()].slice(-8).map(([year, points]) => {
-    const start = points[0]?.value || 1;
-    return { name: year, points: points.map((point) => ({ date: point.date.slice(5), value: (point.value / start - 1) * 100 })) };
-  });
-}
 
 function chartContent(
   chart: ChartDefinition,
@@ -46,10 +33,12 @@ function chartContent(
       />
     );
   }
-  const displaySeries = transformSeries(chart, series);
+  if (chart.slug === "year_to_date_roi") {
+    return <YearToDateRoiChart series={series} />;
+  }
   return (
     <Plot
-      data={displaySeries.map((item) => ({
+      data={series.map((item) => ({
         x: item.points.map((point) => point.date),
         y: item.points.map((point) => point.value),
         name: item.name,

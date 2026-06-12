@@ -16,6 +16,7 @@ export default defineConfig({
         "src/**/*.test.{ts,tsx}",
         "src/main.tsx",
         "src/firebase.ts",
+        "src/components/FinancialYtdPlot.tsx",
         "src/components/Plot.tsx",
         "src/test/**"
       ],

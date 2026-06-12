@@ -28,6 +28,9 @@ vi.mock("../api/client", () => ({ getApiError: () => "Request failed." }));
 vi.mock("../components/Plot", () => ({
   Plot: ({ data }: { data: Array<{ name?: string }> }) => <div data-testid="plot">{data.map((item) => item.name).join(",")}</div>
 }));
+vi.mock("../components/YearToDateRoiChart", () => ({
+  YearToDateRoiChart: () => <div data-testid="ytd-chart">Professional YTD chart</div>
+}));
 
 import { ChartsPage } from "./ChartsPage";
 import { DashboardPage } from "./DashboardPage";
@@ -68,7 +71,7 @@ describe("application pages", () => {
     fireEvent.change(screen.getByPlaceholderText("Search charts"), { target: { value: "" } });
     fireEvent.click(screen.getByRole("button", { name: "Crypto" }));
     fireEvent.click(screen.getByText("Bitcoin ROI"));
-    expect(await screen.findByTestId("plot")).toHaveTextContent("2025");
+    expect(await screen.findByTestId("ytd-chart")).toHaveTextContent("Professional YTD chart");
     fireEvent.click(screen.getByRole("button", { name: "" }));
     await waitFor(() => expect(chartsApi.toggleFavourite).toHaveBeenCalledWith("Bitcoin ROI", expect.anything()));
     fireEvent.click(screen.getByText("Back to charts"));
