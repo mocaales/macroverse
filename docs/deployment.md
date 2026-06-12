@@ -34,6 +34,7 @@ Production requires:
 - Firestore created in production mode
 - `firestore.rules` deployed
 - Render frontend domains added under **Authentication > Settings > Authorized domains**
+- The intended administrator registered with the email configured in `ADMIN_EMAIL`
 
 The web configuration is public application metadata. The service-account credential is private and belongs only in the backend environment.
 
@@ -66,6 +67,7 @@ Create a Render Blueprint from the repository root. The committed `render.yaml` 
 | --- | --- | --- |
 | `ENVIRONMENT` | Yes | Set to `production` |
 | `CORS_ORIGINS` | Yes | Exact HTTPS frontend origins, comma-separated |
+| `ADMIN_EMAIL` | Yes | Sole Firebase account granted the administrator role |
 | `FIREBASE_PROJECT_ID` | Yes | Firebase project identifier |
 | `FIREBASE_SERVICE_ACCOUNT_BASE64` | Yes | Base64 service-account JSON |
 | `MARKET_DATABASE_URL` | Yes | Tiger Cloud URL with TLS |
@@ -91,6 +93,8 @@ Use exact HTTPS origins and omit trailing slashes:
 CORS_ORIGINS=https://macroverse-web.onrender.com
 VITE_API_URL=https://macroverse-api.onrender.com/api/v1
 ```
+
+Changing `ADMIN_EMAIL` transfers administrative access after the new account signs in and obtains a fresh ID token. Keep this value server-side; it is not a frontend authorization control.
 
 ## GitHub Configuration
 
@@ -142,7 +146,7 @@ Then verify:
 
 1. The frontend loads over HTTPS.
 2. Firebase sign-in succeeds on the production domain.
-3. An authenticated account request succeeds.
-4. Chart series return stored observations.
-5. Render health checks and GitHub scheduled syncs remain green.
-
+3. The configured administrator can open `/admin`, while a normal user receives `403` from admin API routes.
+4. An authenticated account request succeeds.
+5. Chart series return stored observations.
+6. Render health checks and GitHub scheduled syncs remain green.

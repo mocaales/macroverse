@@ -24,10 +24,13 @@ The browser is not trusted to provide a user identifier or access Firestore dire
 ## Authentication and Authorization
 
 - Firebase Authentication stores credentials and manages sessions.
-- FastAPI verifies every protected request with Firebase Admin.
+- FastAPI verifies every protected request, including token revocation, with Firebase Admin.
 - Firestore paths are derived from the verified `uid`.
 - Firestore client rules deny all browser reads and writes.
 - A `401` response causes the frontend to clear the current Firebase session.
+- The backend derives the role from the verified email and `ADMIN_EMAIL`; browser role values are never trusted.
+- Exactly one configured email receives the `admin` role. All other accounts receive the `user` role.
+- Admin routes independently enforce authorization and prevent deletion of the active administrator account.
 
 ## Secret Classification
 
@@ -65,6 +68,7 @@ Use comma-separated exact origins when multiple domains are active. Production o
 ## Data Protection
 
 - Portfolio documents are user-scoped in Firestore.
+- Deleting a user removes the Firebase Authentication account and recursively removes its Firestore user document.
 - Market data is shared and contains no user credentials.
 - Passwords are never stored by Macroverse.
 - Logs should not contain bearer tokens, service-account data, database URLs, or request bodies with private financial notes.
@@ -94,6 +98,6 @@ Before production deployment:
 6. Restrict GitHub, Render, Firebase, and Tiger Cloud membership.
 7. Verify health endpoints reveal no sensitive configuration.
 8. Confirm `.env` and service-account files are not tracked.
+9. Confirm `ADMIN_EMAIL` matches the intended Firebase account and that no second account has administrative access.
 
 Report vulnerabilities according to the root [Security Policy](../SECURITY.md).
-

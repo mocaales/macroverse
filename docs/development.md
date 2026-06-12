@@ -21,6 +21,8 @@ cp frontend/.env.example frontend/.env
 
 Use the root `.env` for Docker Compose, `backend/.env` for native Python development, and `frontend/.env` for native Vite development.
 
+Set `ADMIN_EMAIL` to the sole administrator account in the root and backend environments. Role assignment is performed by FastAPI from the verified Firebase token; it is not stored or selected during registration.
+
 Do not commit service-account JSON, encoded service accounts, database URLs, passwords, or provider tokens.
 
 ## Firebase Development Setup
@@ -126,6 +128,7 @@ Vite runs on `http://localhost:5173` and proxies `/api` to `http://localhost:800
 
 - Backend tests cover route behavior, analytics, provider parsing, repositories, configuration, migrations, and CLI dispatch.
 - Frontend tests cover API adapters, authentication, routing, page workflows, and form behavior.
+- Authorization tests cover administrator role derivation, user listing, protected deletion, and self-deletion prevention.
 - External systems are replaced by deterministic fakes or mocks in unit tests.
 - CI runs migrations against an isolated TimescaleDB service.
 
@@ -154,4 +157,3 @@ Before opening a pull request:
 make quality
 docker compose config
 ```
-

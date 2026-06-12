@@ -6,6 +6,7 @@ Macroverse separates interactive portfolio workflows from shared market-data ing
 
 - The browser owns presentation and Firebase sign-in.
 - FastAPI owns authorization, validation, analytics, and persistence orchestration.
+- FastAPI derives the sole administrator role from the verified Firebase email.
 - Firestore stores private, user-scoped application data.
 - TimescaleDB stores shared market observations optimized for time-range queries.
 - Provider ingestion runs outside request handling so external latency does not block normal application traffic.
@@ -103,6 +104,42 @@ sequenceDiagram
 ```
 
 The immutable Firebase `uid`, not an email supplied by the browser, determines the Firestore document path.
+
+## Role Model
+
+Macroverse has two roles:
+
+| Role | Assignment | Access |
+| --- | --- | --- |
+| `admin` | Verified Firebase email equals `ADMIN_EMAIL` | Standard application and user administration |
+| `user` | Every other Firebase account | Standard application only |
+
+Roles are derived for each authenticated request and are not accepted from the frontend or stored as editable Firestore profile data. The admin navigation is a presentation convenience; FastAPI remains the authorization boundary.
+
+## User Administration Sequence
+
+```mermaid
+sequenceDiagram
+    actor Administrator
+    participant Web as React admin panel
+    participant API as FastAPI
+    participant Auth as Firebase Authentication
+    participant FS as Firestore
+
+    Administrator->>Web: Open /admin
+    Web->>API: GET /admin/users + ID token
+    API->>Auth: Verify token and revocation state
+    API->>API: Compare verified email with ADMIN_EMAIL
+    API->>Auth: List registered users
+    Auth-->>API: User records
+    API-->>Web: Users with derived roles
+    Administrator->>Web: Delete normal user
+    Web->>API: DELETE /admin/users/{uid}
+    API->>API: Reject administrator self-deletion
+    API->>Auth: Delete authentication account
+    API->>FS: Recursively delete users/{uid}
+    API-->>Web: Deletion confirmed
+```
 
 ## Portfolio Activity
 
@@ -230,6 +267,7 @@ erDiagram
 | Decision | Rationale |
 | --- | --- |
 | Firebase Auth with backend token verification | Managed identity without trusting browser-provided user identifiers |
+| Server-derived single administrator | Prevents privilege selection at signup and keeps authorization out of browser state |
 | Firestore for portfolio documents | Natural user-scoped document model and low operational overhead |
 | TimescaleDB for market observations | Efficient time-series storage, range queries, and PostgreSQL compatibility |
 | Repository boundary | Keeps route and service code independent of persistence SDK details |

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { onAuthStateChanged, signOut } from "firebase/auth";
 
 import { firebaseAuth } from "../../firebase";
+import { authApi } from "../../api/queries";
 import type { User } from "../../types";
 
 interface AuthContextValue {
@@ -20,21 +21,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(
-    () =>
-      onAuthStateChanged(firebaseAuth, (firebaseUser) => {
-        setUser(
-          firebaseUser?.email
-            ? {
-                uid: firebaseUser.uid,
-                email: firebaseUser.email
-              }
-            : null
-        );
-        setLoading(false);
-      }),
-    []
-  );
+  useEffect(() => onAuthStateChanged(firebaseAuth, async (firebaseUser) => {
+    if (!firebaseUser?.email) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+    try {
+      setUser(await authApi.me());
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
+  }), []);
 
   useEffect(() => {
     const clear = async () => {

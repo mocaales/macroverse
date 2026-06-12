@@ -10,7 +10,9 @@ Protected endpoints require a Firebase ID token:
 Authorization: Bearer <firebase-id-token>
 ```
 
-The backend verifies the signature and expiration with Firebase Admin. Missing, invalid, or expired tokens return `401`. A valid token without an email claim returns `403`.
+The backend verifies the signature, expiration, and revocation state with Firebase Admin. Missing, invalid, expired, or revoked tokens return `401`. A valid token without an email claim returns `403`.
+
+The response from `/auth/me` includes a server-derived `role` of `admin` or `user`. The configured `ADMIN_EMAIL` is the only identity assigned the administrator role; all other Firebase accounts are normal users.
 
 ## Endpoints
 
@@ -19,6 +21,8 @@ The backend verifies the signature and expiration with Firebase Admin. Missing, 
 | `GET` | `/health` | No | API process health |
 | `GET` | `/health/market` | No | TimescaleDB connectivity |
 | `GET` | `/auth/me` | Yes | Return verified identity |
+| `GET` | `/admin/users` | Admin | List registered Firebase users |
+| `DELETE` | `/admin/users/{uid}` | Admin | Delete a Firebase user and private Firestore data |
 | `GET` | `/portfolio/accounts` | Yes | List accounts |
 | `POST` | `/portfolio/accounts` | Yes | Create or update an account by name |
 | `GET` | `/portfolio/trades` | Yes | List trades, optionally filtered by account |
@@ -50,6 +54,16 @@ curl \
   -H "Authorization: Bearer ${FIREBASE_ID_TOKEN}" \
   http://localhost:8000/api/v1/portfolio/accounts
 ```
+
+### List registered users
+
+```bash
+curl \
+  -H "Authorization: Bearer ${FIREBASE_ID_TOKEN}" \
+  http://localhost:8000/api/v1/admin/users
+```
+
+The token must belong to the configured administrator. The administrator account is included in the response but cannot be deleted.
 
 ### Create an account
 
@@ -97,5 +111,4 @@ FastAPI errors use the standard detail object:
 }
 ```
 
-Client applications should handle `401` by clearing the Firebase session and prompting the user to sign in again.
-
+Client applications should handle `401` by clearing the Firebase session and prompting the user to sign in again. Admin endpoints return `403` for normal users, `400` for an attempt to delete the administrator account, and `404` when the requested user no longer exists.

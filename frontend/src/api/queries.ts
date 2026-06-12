@@ -1,13 +1,24 @@
 import { api } from "./client";
 import type {
   Account,
+  AdminUser,
   Asset,
   ChartDefinition,
   ChartSeries,
   DashboardSummary,
   JournalSummary,
-  Trade
+  Trade,
+  User
 } from "../types";
+
+export const authApi = {
+  me: async () => (await api.get<User>("/auth/me")).data
+};
+
+export const adminApi = {
+  users: async () => (await api.get<AdminUser[]>("/admin/users")).data,
+  deleteUser: async (uid: string) => (await api.delete(`/admin/users/${uid}`)).data
+};
 
 export const portfolioApi = {
   accounts: async () => (await api.get<Account[]>("/portfolio/accounts")).data,

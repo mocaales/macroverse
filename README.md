@@ -23,6 +23,7 @@ Macroverse is a full-stack financial analytics application. It combines authenti
 - Calculate balance history, realised P&L, win rate, average trade, and position risk.
 - Explore FRED and Bitcoin market datasets through interactive charts.
 - Authenticate users with Firebase Authentication.
+- Assign one configured account as administrator and provide user-account management.
 - Persist private user data in Cloud Firestore and shared market data in TimescaleDB.
 - Synchronize provider data incrementally through a worker or scheduled GitHub Action.
 
@@ -42,7 +43,7 @@ Macroverse is a full-stack financial analytics application. It combines authenti
 
 ```mermaid
 flowchart LR
-    User[User] --> Web[React web application]
+    User[User or administrator] --> Web[React web application]
     Web -->|Authenticate| FirebaseAuth[Firebase Authentication]
     Web -->|Firebase ID token| API[FastAPI API]
     API -->|Verify token| FirebaseAuth
@@ -79,6 +80,8 @@ base64 < /absolute/path/firebase-service-account.json | tr -d '\n'
 ```
 
 Set the result as `FIREBASE_SERVICE_ACCOUNT_BASE64`, then start the stack:
+
+Set `ADMIN_EMAIL` to the sole Firebase account that may access the administration panel. Every other registered account is assigned the `user` role.
 
 ```bash
 make docker-up

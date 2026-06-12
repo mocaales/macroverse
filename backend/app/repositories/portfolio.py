@@ -40,6 +40,9 @@ class PortfolioRepository:
             merge=True,
         )
 
+    def delete_user_data(self, uid: str) -> None:
+        self.db.recursive_delete(self._user(uid))
+
     def list_accounts(self, uid: str) -> list[dict]:
         rows = []
         for snapshot in self._collection(uid, "accounts").stream():

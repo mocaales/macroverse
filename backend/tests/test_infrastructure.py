@@ -14,7 +14,12 @@ def test_auth_route_and_model_modules_import():
     from app.models.charts import ChartDefinition, ChartSeries, SeriesPoint
 
     assert api_router.routes
-    assert UserResponse(uid="u1", email="user@example.com").uid == "u1"
+    assert UserResponse(
+        uid="u1",
+        email="user@example.com",
+        role="user",
+        email_verified=True,
+    ).uid == "u1"
     point = SeriesPoint(date="2026-01-01", value=1)
     assert ChartSeries(name="x", points=[point]).points[0].value == 1
     assert ChartDefinition(

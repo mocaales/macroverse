@@ -17,13 +17,19 @@ def test_valid_firebase_token_returns_uid_and_email(monkeypatch):
     monkeypatch.setattr(
         dependencies.auth,
         "verify_id_token",
-        lambda token, app: {"uid": "firebase-user-123", "email": "trader@example.com"},
+        lambda token, app, check_revoked: {
+            "uid": "firebase-user-123",
+            "email": "trader@example.com",
+            "email_verified": True,
+        },
     )
 
     user = dependencies.get_current_user(HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid-token"))
 
     assert user.uid == "firebase-user-123"
     assert user.email == "trader@example.com"
+    assert user.role == "user"
+    assert user.email_verified is True
 
 
 def test_invalid_token_and_missing_email_are_rejected(monkeypatch):
@@ -31,14 +37,18 @@ def test_invalid_token_and_missing_email_are_rejected(monkeypatch):
     monkeypatch.setattr(
         dependencies.auth,
         "verify_id_token",
-        lambda token, app: (_ for _ in ()).throw(ValueError("bad token")),
+        lambda token, app, check_revoked: (_ for _ in ()).throw(ValueError("bad token")),
     )
     credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="bad")
     with pytest.raises(HTTPException) as invalid:
         dependencies.get_current_user(credentials)
     assert invalid.value.status_code == 401
 
-    monkeypatch.setattr(dependencies.auth, "verify_id_token", lambda token, app: {"uid": "u1"})
+    monkeypatch.setattr(
+        dependencies.auth,
+        "verify_id_token",
+        lambda token, app, check_revoked: {"uid": "u1"},
+    )
     with pytest.raises(HTTPException) as missing_email:
         dependencies.get_current_user(credentials)
     assert missing_email.value.status_code == 403
@@ -59,3 +69,42 @@ def test_dependency_factories(monkeypatch):
     assert dependencies.get_market_repository().pool is pool
     monkeypatch.setattr(dependencies, "get_market_pool", lambda: None)
     assert dependencies.get_market_repository() is None
+
+
+def test_verified_configured_email_is_the_only_admin(monkeypatch):
+    monkeypatch.setattr(dependencies, "get_firebase_app", lambda: object())
+    monkeypatch.setattr(
+        dependencies,
+        "get_settings",
+        lambda: type(
+            "Settings",
+            (),
+            {
+                "admin_email": "admin@example.com",
+                "market_database_batch_size": 10,
+            },
+        )(),
+    )
+    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials="valid")
+    token = {
+        "uid": "admin-uid",
+        "email": "ADMIN@example.com",
+        "email_verified": True,
+    }
+    monkeypatch.setattr(
+        dependencies.auth,
+        "verify_id_token",
+        lambda token_value, app, check_revoked: token,
+    )
+
+    user = dependencies.get_current_user(credentials)
+
+    assert user.role == "admin"
+    assert dependencies.get_current_admin(user) is user
+
+    token["email"] = "user@example.com"
+    normal_user = dependencies.get_current_user(credentials)
+    assert normal_user.role == "user"
+    with pytest.raises(HTTPException) as error:
+        dependencies.get_current_admin(normal_user)
+    assert error.value.status_code == 403

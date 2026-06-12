@@ -87,6 +87,9 @@ th { color: var(--faint); font-size: .62rem; letter-spacing: .09em; text-transfo
 td { padding: .85rem .8rem; color: var(--muted); border-bottom: 1px solid rgba(34,43,59,.75); }
 tr:hover td { background: rgba(255,255,255,.012); color: var(--text); }
 .symbol { color: var(--text); font-weight: 600; }
+.table-detail { display: block; color: var(--faint); margin-top: .25rem; font-size: .62rem; }
+.role-badge { display: inline-flex; align-items: center; gap: .35rem; padding: .3rem .5rem; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); }
+.role-badge.admin { color: var(--green); border-color: rgba(25,212,146,.3); background: rgba(25,212,146,.06); }
 .row-actions { display: flex; gap: .35rem; justify-content: end; }
 .filter-row { display: grid; grid-template-columns: 1.4fr repeat(3, 1fr); gap: .65rem; margin-bottom: 1rem; }
 .account-ledger { display: grid; }

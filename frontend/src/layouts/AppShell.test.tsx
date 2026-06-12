@@ -2,7 +2,14 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ user: null as null | { uid: string; email: string } }));
+const auth = vi.hoisted(() => ({
+  user: null as null | {
+    uid: string;
+    email: string;
+    role: "admin" | "user";
+    email_verified: boolean;
+  }
+}));
 vi.mock("../features/auth/AuthProvider", () => ({ useAuth: () => ({ ...auth, loading: false, logout: vi.fn() }) }));
 vi.mock("../features/auth/AuthDialog", () => ({
   AuthDialog: ({ open, onClose }: { open: boolean; onClose: () => void }) =>
@@ -34,8 +41,20 @@ describe("AppShell", () => {
   });
 
   it("shows the authenticated email", () => {
-    auth.user = { uid: "u-1", email: "user@example.com" };
+    auth.user = { uid: "u-1", email: "user@example.com", role: "user", email_verified: true };
     renderShell();
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
+    expect(screen.queryByText("Admin")).not.toBeInTheDocument();
+  });
+
+  it("shows administration navigation only to the admin", () => {
+    auth.user = {
+      uid: "admin-uid",
+      email: "admin@example.com",
+      role: "admin",
+      email_verified: false
+    };
+    renderShell();
+    expect(screen.getByText("Admin")).toBeInTheDocument();
   });
 });

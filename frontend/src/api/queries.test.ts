@@ -9,7 +9,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock("./client", () => ({ api }));
 
-import { chartsApi, portfolioApi } from "./queries";
+import { adminApi, authApi, chartsApi, portfolioApi } from "./queries";
 
 describe("API queries", () => {
   beforeEach(() => {
@@ -55,9 +55,13 @@ describe("API queries", () => {
     await chartsApi.charts();
     await chartsApi.favourites();
     await chartsApi.series("yield curve");
+    await authApi.me();
+    await adminApi.users();
+    await adminApi.deleteUser("user-1");
 
     expect(api.put).toHaveBeenCalledWith("/portfolio/trades/t1", { pnl: 2 });
     expect(api.get).toHaveBeenCalledWith("/portfolio/journal/Main%20%2F%20USD/summary");
     expect(api.get).toHaveBeenCalledWith("/charts/yield curve/series");
+    expect(api.delete).toHaveBeenCalledWith("/admin/users/user-1");
   });
 });

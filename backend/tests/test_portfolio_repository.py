@@ -91,7 +91,10 @@ def test_repository_crud_contract():
 
 
 def test_repository_helpers_and_favourites():
-    repository = PortfolioRepository(Database())
+    database = Database()
+    deleted = []
+    database.recursive_delete = lambda reference: deleted.append(reference.id)
+    repository = PortfolioRepository(database)
     repository.ensure_user("u1", "a@example.com")
     repository._user("u1").update({"favourites": ["B", "A"]})
     assert repository.favourites("u1") == ["A", "B"]
@@ -101,3 +104,5 @@ def test_repository_helpers_and_favourites():
     assert _normalize_datetime(date(2026, 1, 1)).tzinfo == UTC
     assert _document(Snapshot("x", None)) == {"id": "x"}
     assert _account_id(" Main ") == _account_id("main")
+    repository.delete_user_data("u1")
+    assert deleted == ["u1"]

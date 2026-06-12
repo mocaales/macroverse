@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     api_v1_prefix: str = "/api/v1"
     cors_origins: str = ""
+    admin_email: str = ""
     firebase_project_id: str = ""
     firebase_service_account_base64: str = ""
     market_database_url: str = ""

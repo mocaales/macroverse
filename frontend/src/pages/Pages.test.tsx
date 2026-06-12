@@ -3,7 +3,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const auth = vi.hoisted(() => ({ user: { uid: "u-1", email: "user@example.com" }, loading: false, logout: vi.fn() }));
+const auth = vi.hoisted(() => ({
+  user: {
+    uid: "u-1",
+    email: "user@example.com",
+    role: "user" as "admin" | "user",
+    email_verified: true
+  },
+  loading: false,
+  logout: vi.fn()
+}));
 const portfolioApi = vi.hoisted(() => ({
   accounts: vi.fn(), createAccount: vi.fn(), trades: vi.fn(), createTrade: vi.fn(),
   updateTrade: vi.fn(), deleteTrade: vi.fn(), assets: vi.fn(), createAsset: vi.fn(),
@@ -33,7 +42,7 @@ function renderPage(element: React.ReactNode) {
 describe("application pages", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    auth.user = { uid: "u-1", email: "user@example.com" };
+    auth.user = { uid: "u-1", email: "user@example.com", role: "user", email_verified: true };
     portfolioApi.accounts.mockResolvedValue([]);
     portfolioApi.trades.mockResolvedValue([]);
     portfolioApi.assets.mockResolvedValue([]);

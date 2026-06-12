@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BarChart3, BookOpen, ChartNoAxesCombined, CircleUserRound } from "lucide-react";
+import { BarChart3, BookOpen, ChartNoAxesCombined, CircleUserRound, ShieldCheck } from "lucide-react";
 import { NavLink, Outlet } from "react-router-dom";
 import { AuthDialog } from "../features/auth/AuthDialog";
 import { useAuth } from "../features/auth/AuthProvider";
@@ -25,6 +25,11 @@ export function AppShell() {
           <NavLink to="/charts">
             <ChartNoAxesCombined size={16} /> Charts
           </NavLink>
+          {user?.role === "admin" && (
+            <NavLink to="/admin">
+              <ShieldCheck size={16} /> Admin
+            </NavLink>
+          )}
         </nav>
         <button className="profile-button" onClick={() => setAuthOpen(true)}>
           <CircleUserRound size={18} />

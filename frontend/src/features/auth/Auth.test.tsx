@@ -3,7 +3,9 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const authApi = vi.hoisted(() => ({ me: vi.fn() }));
 vi.mock("../../firebase", () => ({ firebaseAuth: { currentUser: null } }));
+vi.mock("../../api/queries", () => ({ authApi }));
 vi.mock("firebase/auth", () => ({
   onAuthStateChanged: vi.fn(),
   signOut: vi.fn(),
@@ -27,6 +29,12 @@ describe("authentication", () => {
       return vi.fn();
     });
     vi.mocked(signOut).mockResolvedValue();
+    authApi.me.mockResolvedValue({
+      uid: "u-1",
+      email: "user@example.com",
+      role: "user",
+      email_verified: true
+    });
   });
 
   it("tracks Firebase users and clears invalid sessions", async () => {
@@ -37,6 +45,7 @@ describe("authentication", () => {
     render(<AuthProvider><AuthStatus /></AuthProvider>);
 
     expect(await screen.findByText("user@example.com")).toBeInTheDocument();
+    expect(authApi.me).toHaveBeenCalled();
     globalThis.dispatchEvent(new Event("macroverse:unauthorized"));
     await waitFor(() => expect(signOut).toHaveBeenCalled());
   });

@@ -4,6 +4,18 @@ export type ActionType = "Trade" | "Deposit" | "Withdraw";
 export interface User {
   uid: string;
   email: string;
+  role: "admin" | "user";
+  email_verified: boolean;
+}
+
+export interface AdminUser {
+  uid: string;
+  email: string | null;
+  role: "admin" | "user";
+  email_verified: boolean;
+  disabled: boolean;
+  created_at?: string | null;
+  last_sign_in_at?: string | null;
 }
 
 export interface Account {
