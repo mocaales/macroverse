@@ -53,7 +53,7 @@ def trades(
     "/trades",
     response_model=TradeResponse,
     status_code=status.HTTP_201_CREATED,
-    responses={status.HTTP_422_UNPROCESSABLE_CONTENT: {"description": "A symbol is required for trades."}},
+    responses={422: {"description": "A symbol is required for trades."}},
 )
 def create_trade(
     payload: TradeCreate,
@@ -75,7 +75,7 @@ def create_trade(
 @router.put(
     "/trades/{trade_id}",
     response_model=TradeResponse,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Trade not found."}},
+    responses={404: {"description": "Trade not found."}},
 )
 def update_trade(
     trade_id: str,
@@ -99,7 +99,7 @@ def update_trade(
 @router.delete(
     "/trades/{trade_id}",
     response_model=Message,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Trade not found."}},
+    responses={404: {"description": "Trade not found."}},
 )
 def delete_trade(
     trade_id: str,
@@ -133,7 +133,7 @@ def create_asset(
 @router.delete(
     "/assets/{asset_id}",
     response_model=Message,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Asset not found."}},
+    responses={404: {"description": "Asset not found."}},
 )
 def delete_asset(
     asset_id: str,
@@ -149,7 +149,7 @@ def delete_asset(
 @router.get(
     "/dashboard/{account_name}",
     response_model=DashboardSummary,
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Account not found."}},
+    responses={404: {"description": "Account not found."}},
 )
 def dashboard(
     account_name: str,

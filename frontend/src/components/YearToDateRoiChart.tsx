@@ -105,10 +105,13 @@ export function YearToDateRoiChart({ series }: YearToDateRoiChartProps) {
   );
   const averages = useMemo<AverageOverlay[]>(
     () => AVERAGE_OPTIONS.flatMap((option) => {
-      if (!activeAverages.has(option.id)) return [];
-      const years = yearsForAverage(option.id, rangeYears, customAverageYears, latest?.year);
-      if (!years.length) return [];
-      return [{ id: option.id, label: `AVG ${option.label}`, color: option.color, years }];
+      if (activeAverages.has(option.id)) {
+        const years = yearsForAverage(option.id, rangeYears, customAverageYears, latest?.year);
+        if (years.length) {
+          return [{ id: option.id, label: `AVG ${option.label}`, color: option.color, years }];
+        }
+      }
+      return [];
     }),
     [activeAverages, customAverageYears, latest?.year, rangeYears]
   );
@@ -308,7 +311,11 @@ export function YearToDateRoiChart({ series }: YearToDateRoiChartProps) {
             <span className="average" key={average.id}>
               <i style={{ background: average.color }} />
               {average.label}
-              <strong>{hover?.values.get(average.id) !== undefined ? formatPercent(hover.values.get(average.id) || 0) : "—"}</strong>
+              <strong>
+                {hover?.values.has(average.id)
+                  ? formatPercent(hover.values.get(average.id) ?? 0)
+                  : "—"}
+              </strong>
             </span>
           ))}
         </div>
@@ -345,7 +352,7 @@ export function YearToDateRoiChart({ series }: YearToDateRoiChartProps) {
           })}
         </div>
         <div className="ytd-chart-note">
-          X-axis: width · Y-axis: height · plot: both · double-click: reset
+          <span>X-axis: width · Y-axis: height · plot: both · double-click: reset</span>
           <a href="https://www.tradingview.com/" rel="noreferrer" target="_blank">Charts by TradingView</a>
         </div>
       </footer>

@@ -138,8 +138,8 @@ def toggle_favourite(
 @router.get(
     "/{slug}/series",
     responses={
-        status.HTTP_404_NOT_FOUND: {"description": "Stored chart data is not available."},
-        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Market database is unavailable."},
+        404: {"description": "Stored chart data is not available."},
+        503: {"description": "Market database is unavailable."},
     },
 )
 def chart_series(

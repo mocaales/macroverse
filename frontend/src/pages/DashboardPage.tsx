@@ -22,19 +22,33 @@ const money = (value = 0, sign = false) =>
 
 type TradePayload = Parameters<typeof portfolioApi.createTrade>[0];
 
-function accountContent(
-  selected: string,
-  account: Account | undefined,
-  accounts: Account[],
-  assets: Asset[],
-  summary: DashboardSummary | undefined,
-  createAsset: (payload: Omit<Asset, "id" | "created_at">) => void,
-  deleteAsset: (id: string) => void,
-  createTrade: (payload: TradePayload) => void,
-  createAssetPending: boolean,
-  createTradePending: boolean,
-  setSelected: (value: string) => void
-) {
+interface AccountContentProps {
+  selected: string;
+  account?: Account;
+  accounts: Account[];
+  assets: Asset[];
+  summary?: DashboardSummary;
+  createAsset: (payload: Omit<Asset, "id" | "created_at">) => void;
+  deleteAsset: (id: string) => void;
+  createTrade: (payload: TradePayload) => void;
+  createAssetPending: boolean;
+  createTradePending: boolean;
+  setSelected: (value: string) => void;
+}
+
+function accountContent({
+  selected,
+  account,
+  accounts,
+  assets,
+  summary,
+  createAsset,
+  deleteAsset,
+  createTrade,
+  createAssetPending,
+  createTradePending,
+  setSelected
+}: AccountContentProps) {
   if (!selected) {
     return (
       <EmptyState
@@ -207,19 +221,19 @@ export function DashboardPage() {
         </section>
       )}
       {error && <p className="form-error">{error}</p>}
-      {accountContent(
+      {accountContent({
         selected,
         account,
-        accounts.data || [],
-        assets.data || [],
-        summary.data,
-        (payload) => createAsset.mutate(payload),
-        (id) => deleteAsset.mutate(id),
-        (payload) => createTrade.mutate(payload),
-        createAsset.isPending,
-        createTrade.isPending,
+        accounts: accounts.data || [],
+        assets: assets.data || [],
+        summary: summary.data,
+        createAsset: (payload) => createAsset.mutate(payload),
+        deleteAsset: (id) => deleteAsset.mutate(id),
+        createTrade: (payload) => createTrade.mutate(payload),
+        createAssetPending: createAsset.isPending,
+        createTradePending: createTrade.isPending,
         setSelected
-      )}
+      })}
     </div>
   );
 }

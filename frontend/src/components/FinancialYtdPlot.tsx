@@ -14,17 +14,21 @@ import {
   type Time
 } from "lightweight-charts";
 
+import {
+  horizontalZoomRange,
+  interpolateRange,
+  isRangeSettled,
+  normalizedWheelDelta,
+  scaleAutoscaleInfo,
+  verticalZoom as constrainVerticalZoom,
+  type NumericRange
+} from "../features/charts/ytdChartInteraction";
 import type { AnnualRoiSeries } from "../features/charts/ytdRoi";
 
 type ChartSeriesApi = ISeriesApi<"Line">;
 
 interface SeriesMeta {
   id: number | string;
-}
-
-interface NumericRange {
-  from: number;
-  to: number;
 }
 
 export interface HoverReadout {
@@ -87,6 +91,11 @@ function valueFromData(data: unknown) {
   if (!data || typeof data !== "object" || !("value" in data)) return null;
   const value = (data as LineData<Time>).value;
   return typeof value === "number" ? value : null;
+}
+
+function createAutoscaleProvider(getZoom: () => number) {
+  return (baseImplementation: () => AutoscaleInfo | null) =>
+    scaleAutoscaleInfo(baseImplementation(), getZoom());
 }
 
 export function FinancialYtdPlot({
@@ -282,24 +291,10 @@ export function FinancialYtdPlot({
     let targetLogicalRange: NumericRange | null = fullLogicalRange;
     let animationFrame: number | null = null;
     const seriesApis = [...metadata.keys()];
+    const autoscaleInfoProvider = createAutoscaleProvider(() => verticalZoom);
     const applyVerticalZoom = () => {
       seriesApis.forEach((api) => api.applyOptions({
-        autoscaleInfoProvider: (baseImplementation: () => AutoscaleInfo | null) => {
-          const base = baseImplementation();
-          const range = base?.priceRange;
-          if (!base || !range || range.minValue <= 0 || range.maxValue <= 0) return base;
-          const minLog = Math.log(range.minValue);
-          const maxLog = Math.log(range.maxValue);
-          const center = (minLog + maxLog) / 2;
-          const halfSpan = ((maxLog - minLog) / 2) * verticalZoom;
-          return {
-            ...base,
-            priceRange: {
-              minValue: Math.exp(center - halfSpan),
-              maxValue: Math.exp(center + halfSpan)
-            }
-          };
-        }
+        autoscaleInfoProvider
       }));
       chart.priceScale("right").applyOptions({ autoScale: true });
     };
@@ -308,16 +303,9 @@ export function FinancialYtdPlot({
       let settled = true;
 
       if (renderedLogicalRange && targetLogicalRange) {
-        const from = renderedLogicalRange.from
-          + (targetLogicalRange.from - renderedLogicalRange.from) * smoothing;
-        const to = renderedLogicalRange.to
-          + (targetLogicalRange.to - renderedLogicalRange.to) * smoothing;
-        renderedLogicalRange = { from, to };
+        renderedLogicalRange = interpolateRange(renderedLogicalRange, targetLogicalRange, smoothing);
         chart.timeScale().setVisibleLogicalRange(renderedLogicalRange);
-        if (
-          Math.abs(targetLogicalRange.from - from) > 0.015
-          || Math.abs(targetLogicalRange.to - to) > 0.015
-        ) settled = false;
+        if (!isRangeSettled(renderedLogicalRange, targetLogicalRange)) settled = false;
       }
 
       verticalZoom += (targetVerticalZoom - verticalZoom) * smoothing;
@@ -337,40 +325,19 @@ export function FinancialYtdPlot({
       animationFrame = requestAnimationFrame(easeZoom);
     };
     const scheduleZoom = () => {
-      if (animationFrame === null) animationFrame = requestAnimationFrame(easeZoom);
-    };
-    const normalizedWheelDelta = (event: WheelEvent) => {
-      const unit = event.deltaMode === WheelEvent.DOM_DELTA_LINE
-        ? 16
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE
-          ? container.clientHeight
-          : 1;
-      return Math.min(Math.max(event.deltaY * unit, -120), 120);
+      animationFrame ??= requestAnimationFrame(easeZoom);
     };
     const zoomHorizontal = (event: WheelEvent, factor: number) => {
       const range = targetLogicalRange || chart.timeScale().getVisibleLogicalRange();
       if (!range || !fullLogicalRange) return;
       const rect = container.getBoundingClientRect();
-      const pointerRatio = Math.min(Math.max((event.clientX - rect.left) / rect.width, 0), 1);
-      const currentSpan = range.to - range.from;
-      const fullSpan = fullLogicalRange.to - fullLogicalRange.from;
-      const nextSpan = Math.min(Math.max(currentSpan * factor, 8), fullSpan);
-      const anchor = range.from + currentSpan * pointerRatio;
-      let from = anchor - nextSpan * pointerRatio;
-      let to = from + nextSpan;
-      if (from < fullLogicalRange.from) {
-        from = fullLogicalRange.from;
-        to = from + nextSpan;
-      }
-      if (to > fullLogicalRange.to) {
-        to = fullLogicalRange.to;
-        from = to - nextSpan;
-      }
-      targetLogicalRange = { from, to };
+      const pointerRatio = (event.clientX - rect.left) / rect.width;
+      targetLogicalRange = horizontalZoomRange(range, fullLogicalRange, pointerRatio, factor);
     };
     const containWheel = (event: WheelEvent) => {
       event.preventDefault();
-      const factor = Math.exp(normalizedWheelDelta(event) * 0.0018);
+      const delta = normalizedWheelDelta(event.deltaY, event.deltaMode, container.clientHeight);
+      const factor = Math.exp(delta * 0.0018);
       const rect = container.getBoundingClientRect();
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
@@ -382,12 +349,12 @@ export function FinancialYtdPlot({
         return;
       }
       if (overYAxis && !overXAxis) {
-        targetVerticalZoom = Math.min(Math.max(targetVerticalZoom * factor, 0.18), 5);
+        targetVerticalZoom = constrainVerticalZoom(targetVerticalZoom, factor);
         scheduleZoom();
         return;
       }
       zoomHorizontal(event, factor);
-      targetVerticalZoom = Math.min(Math.max(targetVerticalZoom * factor, 0.18), 5);
+      targetVerticalZoom = constrainVerticalZoom(targetVerticalZoom, factor);
       scheduleZoom();
     };
     const resetTimeScale = () => {
