@@ -6,7 +6,10 @@ import { firebaseAuth } from "../firebase";
 const API_PREFIX = "/api/v1";
 
 export function normalizeApiBaseUrl(value?: string): string {
-  const baseUrl = value?.trim().replace(/\/+$/, "");
+  let baseUrl = value?.trim() || "";
+  while (baseUrl.endsWith("/")) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
   if (!baseUrl) return API_PREFIX;
   if (baseUrl.endsWith(API_PREFIX)) return baseUrl;
   if (baseUrl.endsWith("/api")) return `${baseUrl}/v1`;

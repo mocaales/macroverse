@@ -15,6 +15,7 @@ describe("normalizeApiBaseUrl", () => {
     ["", "/api/v1"],
     ["https://macroverse-api.onrender.com", "https://macroverse-api.onrender.com/api/v1"],
     ["https://macroverse-api.onrender.com/", "https://macroverse-api.onrender.com/api/v1"],
+    ["https://macroverse-api.onrender.com///", "https://macroverse-api.onrender.com/api/v1"],
     ["https://macroverse-api.onrender.com/api", "https://macroverse-api.onrender.com/api/v1"],
     ["https://macroverse-api.onrender.com/api/v1", "https://macroverse-api.onrender.com/api/v1"]
   ])("normalizes %s", (value, expected) => {
