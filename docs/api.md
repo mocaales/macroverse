@@ -101,6 +101,8 @@ For deposits and withdrawals, the backend normalizes the symbol to `CASH`, remov
 curl http://localhost:8000/api/v1/charts/year_to_date_roi/series
 ```
 
+Chart endpoints read exclusively from TimescaleDB. Provider APIs are used only by synchronization jobs; normal browser requests never call FRED, Coin Metrics, or CryptoQuant directly. An unavailable database returns `503`, while a known chart without stored observations returns `404`.
+
 ## Error Format
 
 FastAPI errors use the standard detail object:

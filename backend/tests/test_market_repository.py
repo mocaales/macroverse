@@ -65,9 +65,13 @@ class RecordingCursor(FakeCursor):
     def __init__(self) -> None:
         super().__init__(None)
         self.queries: list[str] = []
+        self.result_batches: list[list[dict]] = []
 
     def execute(self, query: str, parameters=None) -> None:
         self.queries.append(query)
+
+    def fetchall(self):
+        return self.result_batches.pop(0) if self.result_batches else []
 
 
 def test_observation_upserts_use_small_committed_batches_without_pipeline():
@@ -94,7 +98,9 @@ def test_observation_upserts_use_small_committed_batches_without_pipeline():
 
 def test_series_queries_health_and_validation():
     cursor = RecordingCursor()
-    cursor.fetchall = lambda: [{"observed_at": datetime(2026, 1, 1, tzinfo=UTC), "value": 1}]
+    cursor.result_batches = [
+        [{"observed_at": datetime(2026, 1, 1, tzinfo=UTC), "value": 1}],
+    ]
     cursor.fetchone = lambda: (1,)
     pool = FakePool(cursor)
     repository = MarketRepository(pool)
@@ -114,9 +120,12 @@ def test_series_queries_health_and_validation():
     assert rows[0]["value"] == 1
     assert repository.healthcheck() is True
     assert repository.upsert_observations([]) == 0
+    assert repository.read_series("fred:DGS10", limit=0) == []
 
     with pytest.raises(ValueError):
         MarketRepository(pool, batch_size=0)
+    with pytest.raises(ValueError):
+        repository.read_series("fred:DGS10", page_size=0)
     with pytest.raises(ValueError):
         repository.upsert_observations(
             [
@@ -124,3 +133,21 @@ def test_series_queries_health_and_validation():
                 MarketObservation("two", datetime.now(UTC), "x"),
             ]
         )
+
+
+def test_series_queries_page_large_results_by_observation_time():
+    cursor = RecordingCursor()
+    cursor.result_batches = [
+        [
+            {"observed_at": datetime(2026, 1, 1, tzinfo=UTC), "value": 1},
+            {"observed_at": datetime(2026, 1, 2, tzinfo=UTC), "value": 2},
+        ],
+        [{"observed_at": datetime(2026, 1, 3, tzinfo=UTC), "value": 3}],
+    ]
+    repository = MarketRepository(FakePool(cursor))
+
+    rows = repository.read_series("fred:DGS10", limit=4, page_size=2)
+
+    assert [row["value"] for row in rows] == [1, 2, 3]
+    assert len(cursor.queries) == 2
+    assert "observed_at > %s" in cursor.queries[1]

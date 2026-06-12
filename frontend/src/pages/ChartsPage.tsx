@@ -36,13 +36,13 @@ function chartContent(
     );
   }
   if (isLoading) {
-    return <EmptyState title="Loading market data" body="External sources can take several seconds to respond." />;
+    return <EmptyState title="Loading market data" body="Reading stored observations from the market database." />;
   }
   if (isError) {
     return (
       <EmptyState
         title="Market data unavailable"
-        body="Check the backend API keys and external data-provider connectivity."
+        body="The requested series is not available in the market database. Check the latest synchronization run."
       />
     );
   }

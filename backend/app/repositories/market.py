@@ -127,28 +127,49 @@ class MarketRepository:
         start: datetime | None = None,
         end: datetime | None = None,
         limit: int = 20_000,
+        page_size: int = 2_000,
     ) -> list[dict]:
-        clauses = ["series_id = %s"]
-        parameters: list = [series_id]
+        if limit < 1:
+            return []
+        if page_size < 1:
+            raise ValueError("page_size must be at least 1")
+
+        base_clauses = ["series_id = %s"]
+        base_parameters: list = [series_id]
         if start:
-            clauses.append("observed_at >= %s")
-            parameters.append(start)
+            base_clauses.append("observed_at >= %s")
+            base_parameters.append(start)
         if end:
-            clauses.append("observed_at <= %s")
-            parameters.append(end)
-        parameters.append(limit)
+            base_clauses.append("observed_at <= %s")
+            base_parameters.append(end)
+
+        rows: list[dict] = []
+        last_observed_at: datetime | None = None
         with self.pool.connection() as connection, connection.cursor(row_factory=dict_row) as cursor:
-            cursor.execute(
-                f"""
-                SELECT observed_at, value, open, high, low, close, volume
-                FROM market_observations
-                WHERE {" AND ".join(clauses)}
-                ORDER BY observed_at ASC
-                LIMIT %s
-                """,
-                parameters,
-            )
-            return list(cursor.fetchall())
+            while len(rows) < limit:
+                clauses = list(base_clauses)
+                parameters = list(base_parameters)
+                if last_observed_at is not None:
+                    clauses.append("observed_at > %s")
+                    parameters.append(last_observed_at)
+                batch_limit = min(page_size, limit - len(rows))
+                parameters.append(batch_limit)
+                cursor.execute(
+                    f"""
+                    SELECT observed_at, value, open, high, low, close, volume
+                    FROM market_observations
+                    WHERE {" AND ".join(clauses)}
+                    ORDER BY observed_at ASC
+                    LIMIT %s
+                    """,
+                    parameters,
+                )
+                batch = list(cursor.fetchall())
+                rows.extend(batch)
+                if len(batch) < batch_limit:
+                    break
+                last_observed_at = batch[-1]["observed_at"]
+        return rows
 
     def latest_observation_at(self, series_id: str) -> datetime | None:
         with self.pool.connection() as connection, connection.cursor() as cursor:

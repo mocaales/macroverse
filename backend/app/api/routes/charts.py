@@ -11,7 +11,7 @@ from app.api.dependencies import (
 )
 from app.repositories.market import MarketRepository
 from app.repositories.portfolio import PortfolioRepository
-from app.services.market_data import FRED_SERIES, btc_prices, fred_series
+from app.services.market_data import FRED_SERIES
 from app.services.market_sync import BTC_SERIES_ID
 
 CHARTS = [
@@ -137,12 +137,21 @@ def toggle_favourite(
 
 @router.get(
     "/{slug}/series",
-    responses={status.HTTP_404_NOT_FOUND: {"description": "Chart data is not available."}},
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Stored chart data is not available."},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"description": "Market database is unavailable."},
+    },
 )
 def chart_series(
     slug: str,
     market_repository: Annotated[MarketRepository | None, Depends(get_market_repository)],
 ) -> list[dict]:
+    if market_repository is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Market database is not configured.",
+        )
+
     if slug in {
         "bitcoin_cycles_roi",
         "bitcoin_cycles_roi_peak",
@@ -151,45 +160,37 @@ def chart_series(
         "bitcoin_historical_returns",
     }:
         stored = _read_stored_series(market_repository, BTC_SERIES_ID)
-        if stored:
-            return [{"name": "BTC / USD", "points": stored}]
-        frame = btc_prices()
-        return [
-            {
-                "name": "BTC / USD",
-                "points": [
-                    {"date": row.date.date().isoformat(), "value": float(row.value)}
-                    for row in frame.itertuples(index=False)
-                ],
-            }
-        ]
+        if not stored:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Stored Bitcoin market data is not available.",
+            )
+        return [{"name": "BTC / USD", "points": stored}]
+
     if slug in {"treasury_yield_curve", "treasury_yield_spreads"}:
         series = []
         for name, series_id in FRED_SERIES.items():
             stored = _read_stored_series(market_repository, f"fred:{series_id}")
             if stored:
                 series.append({"name": name, "points": stored})
-                continue
-            frame = fred_series(series_id)
-            series.append(
-                {
-                    "name": name,
-                    "points": [
-                        {"date": str(row.date), "value": float(row.value)} for row in frame.itertuples(index=False)
-                    ],
-                }
+        if not series:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Stored Treasury market data is not available.",
             )
         return series
+
     raise HTTPException(status_code=404, detail="Chart data is not available.")
 
 
-def _read_stored_series(repository: MarketRepository | None, series_id: str) -> list[dict]:
-    if repository is None:
-        return []
+def _read_stored_series(repository: MarketRepository, series_id: str) -> list[dict]:
     try:
         rows = repository.read_series(series_id)
-    except PsycopgError:
-        return []
+    except PsycopgError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Market database is temporarily unavailable.",
+        ) from exc
     return [
         {
             "date": row["observed_at"].date().isoformat(),

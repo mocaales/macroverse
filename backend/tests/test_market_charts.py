@@ -1,6 +1,5 @@
 from datetime import UTC, datetime
 
-import pandas as pd
 import pytest
 from fastapi import HTTPException
 from psycopg import OperationalError
@@ -28,11 +27,7 @@ def test_read_stored_series_formats_database_rows_for_chart_api():
     assert points == [{"date": "2026-06-11", "value": 105_000.0}]
 
 
-def test_read_stored_series_handles_unconfigured_database():
-    assert _read_stored_series(None, "coinmetrics:btc:PriceUSD:1d") == []
-
-
-def test_chart_catalogue_favourites_and_provider_fallback(monkeypatch):
+def test_chart_catalogue_and_favourites():
     user = AuthenticatedUser(uid="u1", email="user@example.com")
 
     class Portfolio:
@@ -46,25 +41,62 @@ def test_chart_catalogue_favourites_and_provider_fallback(monkeypatch):
     assert charts.favourites(user, Portfolio()) == ["Yield"]
     assert charts.toggle_favourite("Bitcoin", user, Portfolio()) == ["Bitcoin"]
 
-    frame = pd.DataFrame([{"date": pd.Timestamp("2026-01-01T00:00:00Z"), "value": 10}])
-    monkeypatch.setattr(charts, "btc_prices", lambda: frame)
-    result = charts.chart_series("year_to_date_roi", None)
-    assert result[0]["points"][0]["value"] == 10
 
-    monkeypatch.setattr(charts, "FRED_SERIES", {"10 Year": "DGS10"})
-    monkeypatch.setattr(charts, "fred_series", lambda series_id: frame)
-    assert charts.chart_series("treasury_yield_curve", None)[0]["name"] == "10 Year"
+def test_chart_series_requires_market_database():
+    with pytest.raises(HTTPException) as error:
+        charts.chart_series("year_to_date_roi", None)
+
+    assert error.value.status_code == 503
+    assert error.value.detail == "Market database is not configured."
 
 
-def test_chart_series_prefers_storage_and_handles_database_errors():
+def test_chart_series_reads_bitcoin_from_storage():
     repository = FakeMarketRepository()
     assert charts.chart_series("bitcoin_cycles_roi", repository)[0]["points"][0]["value"] == 105_000
+
+
+def test_chart_series_reads_available_treasury_storage(monkeypatch):
+    class TreasuryRepository:
+        def read_series(self, series_id):
+            if series_id == "fred:DGS10":
+                return [
+                    {
+                        "observed_at": datetime(2026, 6, 11, tzinfo=UTC),
+                        "value": 4.5,
+                        "close": None,
+                    }
+                ]
+            return []
+
+    monkeypatch.setattr(charts, "FRED_SERIES", {"10 Year": "DGS10", "30 Year": "DGS30"})
+
+    result = charts.chart_series("treasury_yield_curve", TreasuryRepository())
+
+    assert result == [{"name": "10 Year", "points": [{"date": "2026-06-11", "value": 4.5}]}]
+
+
+def test_chart_series_handles_missing_storage_and_database_errors(monkeypatch):
+    class EmptyRepository:
+        def read_series(self, series_id):
+            return []
+
+    with pytest.raises(HTTPException) as bitcoin_error:
+        charts.chart_series("year_to_date_roi", EmptyRepository())
+    assert bitcoin_error.value.status_code == 404
+
+    monkeypatch.setattr(charts, "FRED_SERIES", {"10 Year": "DGS10"})
+    with pytest.raises(HTTPException) as treasury_error:
+        charts.chart_series("treasury_yield_spreads", EmptyRepository())
+    assert treasury_error.value.status_code == 404
 
     class BrokenRepository:
         def read_series(self, series_id):
             raise OperationalError("offline")
 
-    assert _read_stored_series(BrokenRepository(), "x") == []
+    with pytest.raises(HTTPException) as database_error:
+        _read_stored_series(BrokenRepository(), "x")
+    assert database_error.value.status_code == 503
+
     with pytest.raises(HTTPException) as error:
-        charts.chart_series("unknown", None)
+        charts.chart_series("unknown", EmptyRepository())
     assert error.value.status_code == 404

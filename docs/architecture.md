@@ -10,6 +10,7 @@ Macroverse separates interactive portfolio workflows from shared market-data ing
 - Firestore stores private, user-scoped application data.
 - TimescaleDB stores shared market observations optimized for time-range queries.
 - Provider ingestion runs outside request handling so external latency does not block normal application traffic.
+- Chart requests read only persisted observations; provider APIs are never called in the browser request path.
 
 ## System Context
 
@@ -272,4 +273,4 @@ erDiagram
 | TimescaleDB for market observations | Efficient time-series storage, range queries, and PostgreSQL compatibility |
 | Repository boundary | Keeps route and service code independent of persistence SDK details |
 | Rolling seven-day ingestion | Captures late provider corrections while avoiding expensive full-history reads |
-| Provider fallback in chart routes | Keeps selected charts usable while a database is initially empty or temporarily unavailable |
+| Database-only chart reads | Keeps request latency predictable and separates provider availability from production chart access |
