@@ -94,6 +94,8 @@ CORS_ORIGINS=https://macroverse-web.onrender.com
 VITE_API_URL=https://macroverse-api.onrender.com/api/v1
 ```
 
+`VITE_*` values are embedded during the frontend build. After changing one in Render, use **Manual Deploy > Clear build cache & deploy**. The frontend normalizes a bare API hostname to `/api/v1`, but the explicit full URL remains recommended.
+
 Changing `ADMIN_EMAIL` transfers administrative access after the new account signs in and obtains a fresh ID token. Keep this value server-side; it is not a frontend authorization control.
 
 ## GitHub Configuration

@@ -3,8 +3,18 @@ import { FirebaseError } from "firebase/app";
 
 import { firebaseAuth } from "../firebase";
 
+const API_PREFIX = "/api/v1";
+
+export function normalizeApiBaseUrl(value?: string): string {
+  const baseUrl = value?.trim().replace(/\/+$/, "");
+  if (!baseUrl) return API_PREFIX;
+  if (baseUrl.endsWith(API_PREFIX)) return baseUrl;
+  if (baseUrl.endsWith("/api")) return `${baseUrl}/v1`;
+  return `${baseUrl}${API_PREFIX}`;
+}
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "/api/v1",
+  baseURL: normalizeApiBaseUrl(import.meta.env.VITE_API_URL),
   timeout: 35_000
 });
 

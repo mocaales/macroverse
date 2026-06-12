@@ -7,7 +7,20 @@ vi.mock("../firebase", () => ({
   firebaseAuth
 }));
 
-import { api, getApiError } from "./client";
+import { api, getApiError, normalizeApiBaseUrl } from "./client";
+
+describe("normalizeApiBaseUrl", () => {
+  it.each([
+    [undefined, "/api/v1"],
+    ["", "/api/v1"],
+    ["https://macroverse-api.onrender.com", "https://macroverse-api.onrender.com/api/v1"],
+    ["https://macroverse-api.onrender.com/", "https://macroverse-api.onrender.com/api/v1"],
+    ["https://macroverse-api.onrender.com/api", "https://macroverse-api.onrender.com/api/v1"],
+    ["https://macroverse-api.onrender.com/api/v1", "https://macroverse-api.onrender.com/api/v1"]
+  ])("normalizes %s", (value, expected) => {
+    expect(normalizeApiBaseUrl(value)).toBe(expected);
+  });
+});
 
 describe("getApiError", () => {
   beforeEach(() => {
