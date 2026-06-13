@@ -1,14 +1,16 @@
 import { useMemo, useState } from "react";
 import { MetricStrip } from "../../components/MetricStrip";
+import type { CurrencyCode } from "../../types";
 
-const money = (value: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+const money = (value: number, currency: CurrencyCode) =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value);
 
 interface RiskCalculatorProps {
   readonly initialBalance: number;
+  readonly currency?: CurrencyCode;
 }
 
-export function RiskCalculator({ initialBalance }: RiskCalculatorProps) {
+export function RiskCalculator({ initialBalance, currency = "USD" }: RiskCalculatorProps) {
   const [portfolio, setPortfolio] = useState(Math.max(initialBalance, 0));
   const [risk, setRisk] = useState(1);
   const [stop, setStop] = useState(2);
@@ -57,10 +59,10 @@ export function RiskCalculator({ initialBalance }: RiskCalculatorProps) {
       </div>
       <MetricStrip
         metrics={[
-          { label: "Recommended margin", value: money(result.margin) },
-          { label: "Position size", value: money(result.position) },
-          { label: "Maximum loss", value: money(result.maximumLoss), tone: "negative" },
-          { label: "Target profit", value: money(result.target), tone: "positive" }
+          { label: "Recommended margin", value: money(result.margin, currency) },
+          { label: "Position size", value: money(result.position, currency) },
+          { label: "Maximum loss", value: money(result.maximumLoss, currency), tone: "negative" },
+          { label: "Target profit", value: money(result.target, currency), tone: "positive" }
         ]}
       />
     </section>

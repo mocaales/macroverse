@@ -7,6 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     app_name: str = "Macroverse API"
     environment: str = "development"
+    app_timezone: str = "Europe/Ljubljana"
     api_v1_prefix: str = "/api/v1"
     cors_origins: str = ""
     admin_email: str = ""

@@ -25,13 +25,16 @@ The response from `/auth/me` includes a server-derived `role` of `admin` or `use
 | `DELETE` | `/admin/users/{uid}` | Admin | Delete a Firebase user and private Firestore data |
 | `GET` | `/portfolio/accounts` | Yes | List accounts |
 | `POST` | `/portfolio/accounts` | Yes | Create or update an account by name |
+| `DELETE` | `/portfolio/accounts/{account_name}` | Yes | Delete an account and its related portfolio records |
 | `GET` | `/portfolio/trades` | Yes | List trades, optionally filtered by account |
 | `POST` | `/portfolio/trades` | Yes | Create a trade, deposit, or withdrawal |
 | `PUT` | `/portfolio/trades/{trade_id}` | Yes | Update a ledger entry |
 | `DELETE` | `/portfolio/trades/{trade_id}` | Yes | Delete a ledger entry |
-| `GET` | `/portfolio/assets` | Yes | List investments, optionally filtered by account |
-| `POST` | `/portfolio/assets` | Yes | Create an investment holding |
-| `DELETE` | `/portfolio/assets/{asset_id}` | Yes | Delete an investment holding |
+| `GET` | `/portfolio/recurring-transactions` | Yes | List recurring bank transactions |
+| `POST` | `/portfolio/recurring-transactions` | Yes | Create recurring bank automation |
+| `PUT` | `/portfolio/recurring-transactions/{id}` | Yes | Edit recurring bank automation |
+| `DELETE` | `/portfolio/recurring-transactions/{id}` | Yes | Delete recurring bank automation |
+| `GET` | `/portfolio/dashboard` | Yes | Return the aggregate dashboard and live per-account balances for one currency |
 | `GET` | `/portfolio/dashboard/{account}` | Yes | Return account performance summary |
 | `GET` | `/portfolio/journal/{account}/summary` | Yes | Return journal summary |
 | `GET` | `/charts` | No | List chart definitions |
@@ -71,7 +74,7 @@ The token must belong to the configured administrator. The administrator account
 curl -X POST \
   -H "Authorization: Bearer ${FIREBASE_ID_TOKEN}" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Primary","starting_balance":10000,"type":"Trading"}' \
+  -d '{"name":"Primary","starting_balance":10000,"type":"Trading Account","currency":"EUR"}' \
   http://localhost:8000/api/v1/portfolio/accounts
 ```
 
@@ -93,7 +96,31 @@ curl -X POST \
   http://localhost:8000/api/v1/portfolio/trades
 ```
 
-For deposits and withdrawals, the backend normalizes the symbol to `CASH`, removes direction, and applies the appropriate P&L sign.
+Savings and bank accounts reject trade actions. Their deposits and withdrawals require a description; bank transactions additionally require a category. Trading accounts preserve the existing trade, deposit, and withdrawal workflow.
+
+### Create a recurring bank transaction
+
+```bash
+curl -X POST \
+  -H "Authorization: Bearer ${FIREBASE_ID_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "account":"Primary bank",
+    "action":"Deposit",
+    "amount":100,
+    "description":"Monthly salary allocation",
+    "category":"Salary",
+    "day_of_month":1,
+    "start_date":"2026-07-01"
+  }' \
+  http://localhost:8000/api/v1/portfolio/recurring-transactions
+```
+
+Due occurrences are materialized immediately when automation is created and whenever portfolio data is requested afterward. Each generated transaction uses a deterministic monthly identifier, so concurrent refreshes cannot create duplicate ledger entries.
+
+Editing an automation preserves its identifier and changes the rules used for subsequent synchronization. Deleting an automation stops future occurrences; transactions already materialized in the ledger remain as historical records.
+
+Account balances are derived from the persisted starting balance and Firestore ledger entries. The aggregate dashboard returns these live balances for the Portfolio account list; it does not rely on a separately stored balance field that could become stale.
 
 ### Read a chart series
 

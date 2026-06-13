@@ -151,17 +151,26 @@ flowchart TD
     Create --> Workspace
     Select -- Yes --> Workspace[Open account workspace]
     Workspace --> Type{Account type}
-    Type -- Trading / Banking --> Entry[Record trade, deposit, or withdrawal]
-    Entry --> Normalize[Normalize symbol and cash sign]
+    Type -- Trading account --> Trading[Record trade, deposit, or withdrawal]
+    Type -- Savings --> Savings[Record described deposit or withdrawal]
+    Type -- Bank account --> Bank[Record categorized deposit or withdrawal]
+    Bank --> Schedule{Recurring?}
+    Schedule -- Yes --> Rule[Store monthly rule]
+    Schedule -- No --> Entry
+    Rule --> Reconcile[Compare rule with current local date]
+    Reconcile --> Entry[Create idempotent due transaction]
+    Trading --> Normalize[Normalize symbol and cash sign]
+    Savings --> Normalize
+    Bank --> Normalize
+    Entry --> Normalize
     Normalize --> StoreTrade[Store ledger entry in Firestore]
     StoreTrade --> Analytics[Recalculate balance and performance]
-    Type -- Investing --> Asset[Add or remove holding]
-    Asset --> StoreAsset[Store investment in Firestore]
-    Type -- Overall --> Aggregate[Display account overview]
+    Workspace --> Aggregate[Aggregate accounts sharing selected currency]
     Analytics --> End([Updated dashboard])
-    StoreAsset --> End
     Aggregate --> End
 ```
+
+Account balances are never added across unlike currencies. The frontend automatically requests and displays a separate aggregate for every currency represented by the user's accounts; FX conversion can be added later without corrupting historical totals.
 
 ## Market Synchronization Activity
 
@@ -229,6 +238,13 @@ erDiagram
 ```
 
 All documents are nested under `users/{firebaseUid}`. Firestore client rules deny direct browser access; the backend uses Firebase Admin IAM.
+
+Portfolio data is stored in these Firestore paths:
+
+- `users/{firebaseUid}/accounts/{accountId}` for savings, bank, and trading accounts
+- `users/{firebaseUid}/trades/{transactionId}` for deposits, withdrawals, and trades
+- `users/{firebaseUid}/recurring_transactions/{automationId}` for bank-account automations
+- `users/{firebaseUid}/investments/{investmentId}` for investment positions
 
 ### TimescaleDB
 

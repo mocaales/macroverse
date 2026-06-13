@@ -7,9 +7,10 @@ import { AccountSelector } from "../components/AccountSelector";
 import { EmptyState } from "../components/EmptyState";
 import { MetricStrip } from "../components/MetricStrip";
 import { useAuth } from "../features/auth/AuthProvider";
-import type { Trade } from "../types";
+import type { CurrencyCode, Trade } from "../types";
 
-const money = (value = 0) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+const money = (value = 0, currency: CurrencyCode = "EUR") =>
+  new Intl.NumberFormat("en-US", { style: "currency", currency }).format(value);
 
 export function JournalPage() {
   const { user } = useAuth();
@@ -22,6 +23,8 @@ export function JournalPage() {
   const [editing, setEditing] = useState<Trade | null>(null);
   const [error, setError] = useState("");
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: portfolioApi.accounts, enabled: Boolean(user) });
+  const tradingAccounts = (accounts.data || []).filter((account) => account.type === "Trading Account");
+  const selectedAccount = tradingAccounts.find((account) => account.name === selected);
   const trades = useQuery({ queryKey: ["trades", selected], queryFn: () => portfolioApi.trades(selected), enabled: Boolean(user && selected) });
   const summary = useQuery({
     queryKey: ["journal-summary", selected],
@@ -30,8 +33,14 @@ export function JournalPage() {
   });
 
   useEffect(() => {
-    if (!selected && accounts.data?.length) setSelected(accounts.data[0].name);
-  }, [accounts.data, selected]);
+    if (!selected && tradingAccounts.length) setSelected(tradingAccounts[0].name);
+  }, [selected, tradingAccounts]);
+
+  useEffect(() => {
+    if (selected && accounts.isSuccess && !selectedAccount) {
+      setSelected(tradingAccounts[0]?.name || "");
+    }
+  }, [accounts.isSuccess, selected, selectedAccount, tradingAccounts]);
 
   const filtered = useMemo(() => {
     const rows = [...(trades.data || [])].filter((trade) => {
@@ -67,19 +76,27 @@ export function JournalPage() {
   });
 
   if (!user) return <EmptyState title="Authentication required" body="Sign in to review and manage your trade history." />;
+  if (accounts.isSuccess && !tradingAccounts.length) {
+    return (
+      <EmptyState
+        title="Trading account required"
+        body="The journal is available only for Trading Accounts. Create one from the dashboard to start recording trades."
+      />
+    );
+  }
 
   return (
     <div className="page">
       <section className="page-toolbar">
         <div><p className="eyebrow">Execution record</p><h1>Trade journal</h1></div>
-        <AccountSelector accounts={accounts.data || []} value={selected} onChange={setSelected} />
+        <AccountSelector accounts={tradingAccounts} value={selected} onChange={setSelected} />
       </section>
       <MetricStrip metrics={[
         { label: "Total entries", value: String(summary.data?.total_entries || 0) },
         { label: "Closed trades", value: String(summary.data?.trade_count || 0) },
-        { label: "Net P&L", value: money(summary.data?.realised_pnl), tone: (summary.data?.realised_pnl || 0) >= 0 ? "positive" : "negative" },
+        { label: "Net P&L", value: money(summary.data?.realised_pnl, selectedAccount?.currency), tone: (summary.data?.realised_pnl || 0) >= 0 ? "positive" : "negative" },
         { label: "Win rate", value: `${(summary.data?.win_rate || 0).toFixed(1)}%` },
-        { label: "Average trade", value: money(summary.data?.average_trade) }
+        { label: "Average trade", value: money(summary.data?.average_trade, selectedAccount?.currency) }
       ]} />
       <section className="panel">
         <div className="section-heading"><div><p className="eyebrow">History</p><h2>{filtered.length} ledger entries</h2></div></div>
@@ -104,7 +121,7 @@ export function JournalPage() {
                 <tr key={trade.id}>
                   <td>{trade.trade_time.slice(0, 10)}</td><td>{trade.action}</td><td>{trade.type || "—"}</td>
                   <td className="symbol">{trade.symbol}</td>
-                  <td className={trade.pnl >= 0 ? "positive" : "negative"}>{trade.pnl > 0 ? "+" : ""}{money(trade.pnl)}</td>
+                  <td className={trade.pnl >= 0 ? "positive" : "negative"}>{trade.pnl > 0 ? "+" : ""}{money(trade.pnl, selectedAccount?.currency)}</td>
                   <td className="row-actions">
                     <button className="icon-button" onClick={() => setEditing(trade)}><Pencil size={15} /></button>
                     <button className="icon-button danger-icon" onClick={() => remove.mutate(trade.id)}><Trash2 size={15} /></button>
