@@ -7,7 +7,6 @@ import type {
   ChartSeries,
   DashboardSummary,
   JournalSummary,
-  RecurringTransaction,
   Trade,
   User
 } from "../types";
@@ -52,14 +51,6 @@ export const portfolioApi = {
     (await api.get<DashboardSummary>(`/portfolio/dashboard/${encodeURIComponent(account)}`)).data,
   totalDashboard: async (currency: string) =>
     (await api.get<DashboardSummary>("/portfolio/dashboard", { params: { currency } })).data,
-  recurringTransactions: async (account?: string) =>
-    (await api.get<RecurringTransaction[]>("/portfolio/recurring-transactions", { params: { account } })).data,
-  createRecurringTransaction: async (payload: Omit<RecurringTransaction, "id" | "active" | "created_at">) =>
-    (await api.post<RecurringTransaction>("/portfolio/recurring-transactions", payload)).data,
-  updateRecurringTransaction: async ({ id, ...payload }: Omit<RecurringTransaction, "active" | "created_at">) =>
-    (await api.put<RecurringTransaction>(`/portfolio/recurring-transactions/${id}`, payload)).data,
-  deleteRecurringTransaction: async (id: string) =>
-    (await api.delete(`/portfolio/recurring-transactions/${id}`)).data,
   journalSummary: async (account: string) =>
     (await api.get<JournalSummary>(`/portfolio/journal/${encodeURIComponent(account)}/summary`)).data
 };

@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-AccountType = Literal["Savings", "Bank Account", "Trading Account"]
+AccountType = Literal["Trading Account"]
 CurrencyCode = Literal["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD"]
 ActionType = Literal["Trade", "Deposit", "Withdraw"]
 DirectionType = Literal["Long", "Short"]
@@ -103,37 +103,6 @@ class TradeResponse(BaseModel):
     recurring_schedule_id: str | None = None
 
 
-class RecurringTransactionCreate(BaseModel):
-    account: str = Field(min_length=1, max_length=100)
-    action: Literal["Deposit", "Withdraw"]
-    amount: float = Field(gt=0)
-    description: str = Field(min_length=1, max_length=200)
-    category: TransactionCategory
-    day_of_month: int = Field(ge=1, le=31)
-    start_date: date
-    end_date: date | None = None
-
-    @field_validator("account", "description")
-    @classmethod
-    def clean_recurring_text(cls, value: str) -> str:
-        cleaned = value.strip()
-        if not cleaned:
-            raise ValueError("This field is required.")
-        return cleaned
-
-    @model_validator(mode="after")
-    def validate_date_range(self):
-        if self.end_date and self.end_date < self.start_date:
-            raise ValueError("End date must be on or after the start date.")
-        return self
-
-
-class RecurringTransactionResponse(RecurringTransactionCreate):
-    id: str
-    active: bool = True
-    created_at: datetime | None = None
-
-
 class AssetCreate(BaseModel):
     account: str
     symbol: str
@@ -162,6 +131,12 @@ class EquityPoint(BaseModel):
     balance: float
 
 
+class DailyPnlPoint(BaseModel):
+    date: datetime
+    pnl: float
+    trade_count: int = 0
+
+
 class AccountBalance(BaseModel):
     name: str
     type: AccountType
@@ -182,6 +157,7 @@ class DashboardSummary(BaseModel):
     average_trade: float
     best_trade: float
     equity_curve: list[EquityPoint]
+    daily_pnl: list[DailyPnlPoint] = Field(default_factory=list)
     accounts: list[AccountBalance] = Field(default_factory=list)
 
 

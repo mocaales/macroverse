@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const chartRemove = vi.fn();
   const priceScaleApplyOptions = vi.fn();
   const seriesApplyOptions = vi.fn();
+  const subscribeCrosshairMove = vi.fn();
   const getVisibleLogicalRange = vi.fn(() => ({ from: 0, to: 30 }));
   const addSeries = vi.fn((...args: unknown[]) => {
     void args;
@@ -24,6 +26,7 @@ const mocks = vi.hoisted(() => {
       applyOptions: chartApplyOptions,
       priceScale: () => ({ applyOptions: priceScaleApplyOptions }),
       remove: chartRemove,
+      subscribeCrosshairMove,
       timeScale: () => ({
         fitContent,
         getVisibleLogicalRange,
@@ -41,16 +44,18 @@ const mocks = vi.hoisted(() => {
     priceScaleApplyOptions,
     seriesApplyOptions,
     setData,
-    setVisibleLogicalRange
+    setVisibleLogicalRange,
+    subscribeCrosshairMove
   };
 });
 
 vi.mock("lightweight-charts", () => ({
+  AreaSeries: "AreaSeries",
   ColorType: { Solid: "solid" },
   createChart: mocks.createChart,
   CrosshairMode: { Normal: 0 },
-  LineSeries: "LineSeries",
-  LineStyle: { Dashed: 2, Solid: 0 }
+  LineStyle: { Dashed: 2, Solid: 0 },
+  LineType: { Curved: 2 }
 }));
 
 class ResizeObserverMock {
@@ -79,10 +84,16 @@ interface ChartOptionsUnderTest {
 }
 
 interface SeriesOptionsUnderTest {
-  color: string;
+  bottomColor: string;
+  lastValueVisible: boolean;
+  lineColor: string;
+  lineType: number;
+  lineWidth: number;
   priceFormat: {
     formatter: (value: number) => string;
   };
+  priceLineVisible: boolean;
+  topColor: string;
 }
 
 describe("BalanceLineChart", () => {
@@ -122,12 +133,42 @@ describe("BalanceLineChart", () => {
     expect(chartOptions.localization.priceFormatter(1250)).toBe("$1,250");
     expect(chartOptions.timeScale.tickMarkFormatter("2026-06-13")).toBe("Jun 13");
     expect(chartOptions.timeScale.tickMarkFormatter({ year: 2026, month: 6, day: 13 })).toBe("");
-    expect(seriesOptions.color).toBe("#ff5c72");
+    expect(seriesOptions.lineColor).toBe("#19d492");
+    expect(seriesOptions.lineType).toBe(2);
+    expect(seriesOptions.topColor).toContain("25, 212, 146");
+    expect(seriesOptions.bottomColor).toContain("25, 212, 146");
+    expect(seriesOptions.lastValueVisible).toBe(false);
+    expect(seriesOptions.lineWidth).toBe(2);
+    expect(seriesOptions.priceLineVisible).toBe(false);
     expect(seriesOptions.priceFormat.formatter(-12.34)).toBe("-$12.34");
     expect(mocks.setData).toHaveBeenCalledWith([
       { time: "2026-06-13", value: -1250.5 },
       { time: "2026-06-14", value: -900 }
     ]);
+  });
+
+  it("shows a custom daily tooltip when hovering a data point", () => {
+    render(<BalanceLineChart currency="USD" points={[
+      { date: "2026-03-25T00:00:00Z", balance: 3306.06 },
+      { date: "2026-03-26T00:00:00Z", balance: 3310 }
+    ]} />);
+
+    const chart = screen.getByTestId("balance-chart");
+    Object.defineProperty(chart, "clientWidth", { configurable: true, value: 800 });
+    Object.defineProperty(chart, "clientHeight", { configurable: true, value: 390 });
+    const handler = mocks.subscribeCrosshairMove.mock.calls[0][0];
+    const series = mocks.addSeries.mock.results[0].value;
+    act(() => {
+      handler({
+        point: { x: 320, y: 180 },
+        seriesData: new Map([[series, { time: "2026-03-25", value: 3306.06 }]]),
+        time: "2026-03-25"
+      });
+    });
+
+    expect(screen.getByText("$3,306.06")).toBeInTheDocument();
+    expect(screen.getByText("03/25")).toBeInTheDocument();
+    expect(screen.getByText("+$0.00")).toBeInTheDocument();
   });
 
   it("resizes with the container observer", () => {
@@ -137,13 +178,13 @@ describe("BalanceLineChart", () => {
     ]} />);
 
     ResizeObserverMock.instances[0].callback([
-      { contentRect: { width: 720 } } as ResizeObserverEntry
+      { contentRect: { height: 410, width: 720 } } as ResizeObserverEntry
     ], ResizeObserverMock.instances[0] as unknown as ResizeObserver);
     ResizeObserverMock.instances[0].callback([
-      { contentRect: { width: 0 } } as ResizeObserverEntry
+      { contentRect: { height: 0, width: 0 } } as ResizeObserverEntry
     ], ResizeObserverMock.instances[0] as unknown as ResizeObserver);
 
-    expect(mocks.chartApplyOptions).toHaveBeenCalledWith({ width: 720 });
+    expect(mocks.chartApplyOptions).toHaveBeenCalledWith({ height: 410, width: 720 });
     expect(mocks.chartApplyOptions).toHaveBeenCalledTimes(1);
   });
 

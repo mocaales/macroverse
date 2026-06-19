@@ -4,7 +4,6 @@
 
 Market data can be synchronized by:
 
-- The continuously running `market-sync` Docker service
 - The hourly GitHub Actions workflow
 - A manual CLI command
 
@@ -84,7 +83,6 @@ Local container status:
 ```bash
 docker compose ps
 docker compose logs -f backend
-docker compose logs -f market-sync
 docker compose logs -f timescaledb
 ```
 
@@ -118,7 +116,7 @@ LIMIT 100;
 
 ### Provider failure
 
-1. Check the worker or workflow log for the provider name.
+1. Check the GitHub Actions workflow log or manual CLI output for the provider name.
 2. Confirm credentials and plan access.
 3. Verify provider availability and endpoint changes.
 4. Rerun routine synchronization.
@@ -144,4 +142,3 @@ Writes are committed in small batches. A failed run can be restarted safely beca
 - Test recovery procedures before relying on them for production incidents.
 
 Local Docker volumes are not a production backup.
-

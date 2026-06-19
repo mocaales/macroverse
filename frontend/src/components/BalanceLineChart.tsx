@@ -1,14 +1,15 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  AreaSeries,
   ColorType,
   createChart,
   CrosshairMode,
-  LineSeries,
   LineStyle,
+  LineType,
   type AutoscaleInfo,
+  type AreaData,
   type IChartApi,
   type ISeriesApi,
-  type LineData,
   type Time
 } from "lightweight-charts";
 
@@ -23,11 +24,20 @@ import {
 import type { CurrencyCode, DashboardSummary } from "../types";
 
 type BalancePoint = DashboardSummary["equity_curve"][number];
-type BalanceSeries = ISeriesApi<"Line">;
+type BalanceSeries = ISeriesApi<"Area">;
 
 interface BalanceLineChartProps {
   readonly currency: CurrencyCode;
   readonly points: BalancePoint[];
+}
+
+interface TooltipState {
+  readonly date: string;
+  readonly delta: string;
+  readonly deltaTone: "positive" | "negative" | "neutral";
+  readonly left: number;
+  readonly top: number;
+  readonly value: string;
 }
 
 function chartTime(value: string): Time {
@@ -45,6 +55,21 @@ function formatMoney(value: number, currency: CurrencyCode) {
     maximumFractionDigits: Math.abs(value) >= 1_000 ? 0 : 2,
     style: "currency"
   }).format(value);
+}
+
+function formatTooltipMoney(value: number, currency: CurrencyCode) {
+  return new Intl.NumberFormat("en-US", {
+    currency,
+    maximumFractionDigits: 2,
+    minimumFractionDigits: 2,
+    style: "currency"
+  }).format(value);
+}
+
+function formatTooltipDate(time: Time) {
+  if (typeof time !== "string") return "";
+  return new Intl.DateTimeFormat("en-US", { day: "2-digit", month: "2-digit", timeZone: "UTC" })
+    .format(new Date(`${time}T00:00:00Z`));
 }
 
 function expandSinglePoint(points: BalancePoint[]) {
@@ -80,17 +105,17 @@ function createAutoscaleProvider(getZoom: () => number) {
 export function BalanceLineChart({ currency, points }: BalanceLineChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipState | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     const seriesPoints = expandSinglePoint(points);
+    setTooltip(null);
     if (!container || !seriesPoints.length) return;
 
-    const latest = seriesPoints.at(-1);
-    const lineColor = (latest?.balance || 0) >= 0 ? "#19d492" : "#ff5c72";
     const chart = createChart(container, {
       width: Math.max(container.clientWidth, 320),
-      height: 390,
+      height: Math.max(container.clientHeight, 320),
       layout: {
         background: { type: ColorType.Solid, color: "#080c12" },
         textColor: "#8290a6",
@@ -108,13 +133,13 @@ export function BalanceLineChart({ currency, points }: BalanceLineChartProps) {
           color: "rgba(198, 210, 227, 0.42)",
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: "#263244"
+          labelBackgroundColor: "#0d1118"
         },
         horzLine: {
-          color: "rgba(198, 210, 227, 0.26)",
+          color: "rgba(198, 210, 227, 0.34)",
           width: 1,
           style: LineStyle.Dashed,
-          labelBackgroundColor: "#263244"
+          labelBackgroundColor: "#0d1118"
         }
       },
       rightPriceScale: {
@@ -160,32 +185,60 @@ export function BalanceLineChart({ currency, points }: BalanceLineChartProps) {
     });
     chartRef.current = chart;
 
-    const series = chart.addSeries(LineSeries, {
-      color: lineColor,
-      crosshairMarkerBackgroundColor: lineColor,
+    const series = chart.addSeries(AreaSeries, {
+      bottomColor: "rgba(25, 212, 146, 0.01)",
+      crosshairMarkerBackgroundColor: "#19d492",
       crosshairMarkerBorderColor: "#080c12",
       crosshairMarkerBorderWidth: 2,
       crosshairMarkerRadius: 5,
-      lastValueVisible: true,
-      lineWidth: 3,
+      lastValueVisible: false,
+      lineColor: "#19d492",
+      lineType: LineType.Curved,
+      lineWidth: 2,
       priceFormat: {
         type: "custom",
         formatter: (value: number) => formatMoney(value, currency)
       },
-      priceLineColor: lineColor,
-      priceLineStyle: LineStyle.Solid,
-      priceLineVisible: true,
-      title: "Balance"
+      priceLineVisible: false,
+      title: "Balance",
+      topColor: "rgba(25, 212, 146, 0.32)"
     });
-    series.setData(seriesPoints.map<LineData<Time>>((point) => ({
+    const dailyChanges = new Map<string, number>();
+    seriesPoints.forEach((point, index) => {
+      dailyChanges.set(String(chartTime(point.date)), index ? point.balance - seriesPoints[index - 1].balance : 0);
+    });
+    series.setData(seriesPoints.map<AreaData<Time>>((point) => ({
       time: chartTime(point.date),
       value: point.balance
     })));
     chart.timeScale().fitContent();
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.point || !param.time) {
+        setTooltip(null);
+        return;
+      }
+      const seriesValue = param.seriesData.get(series) as AreaData<Time> | undefined;
+      if (!seriesValue) {
+        setTooltip(null);
+        return;
+      }
+      const left = Math.min(Math.max(param.point.x + 18, 10), container.clientWidth - 176);
+      const top = Math.min(Math.max(param.point.y + 18, 10), container.clientHeight - 118);
+      const dailyChange = dailyChanges.get(String(param.time)) || 0;
+      setTooltip({
+        date: formatTooltipDate(param.time),
+        delta: `${dailyChange >= 0 ? "+" : ""}${formatTooltipMoney(dailyChange, currency)}`,
+        deltaTone: dailyChange > 0 ? "positive" : dailyChange < 0 ? "negative" : "neutral",
+        left,
+        top,
+        value: formatTooltipMoney(seriesValue.value, currency)
+      });
+    });
 
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
-      if (width) chart.applyOptions({ width });
+      const height = entries[0]?.contentRect.height;
+      if (width && height) chart.applyOptions({ height, width });
     });
     observer.observe(container);
 
@@ -283,5 +336,15 @@ export function BalanceLineChart({ currency, points }: BalanceLineChartProps) {
     };
   }, [currency, points]);
 
-  return <div className="balance-line-chart" data-testid="balance-chart" ref={containerRef} />;
+  return (
+    <div className="balance-line-chart" data-testid="balance-chart" ref={containerRef}>
+      {tooltip && (
+        <div className="balance-chart-tooltip" style={{ left: tooltip.left, top: tooltip.top }}>
+          <strong>{tooltip.value}</strong>
+          <span>{tooltip.date}</span>
+          <em className={tooltip.deltaTone}>{tooltip.delta}</em>
+        </div>
+      )}
+    </div>
+  );
 }

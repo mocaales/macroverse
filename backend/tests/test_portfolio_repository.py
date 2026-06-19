@@ -1,6 +1,13 @@
 from datetime import UTC, date, datetime
 
-from app.repositories.portfolio import PortfolioRepository, _account_id, _document, _normalize_datetime
+from app.repositories.portfolio import (
+    LEDGER_COLLECTION,
+    LEGACY_TRADE_COLLECTION,
+    PortfolioRepository,
+    _account_id,
+    _document,
+    _normalize_datetime,
+)
 
 
 class Snapshot:
@@ -75,6 +82,8 @@ def test_repository_crud_contract():
         "u1",
         {"account": "Main", "trade_time": date(2026, 1, 1), "action": "Trade", "symbol": "BTC", "pnl": 10},
     )
+    assert trade["id"] in db.users[LEDGER_COLLECTION]
+    assert LEGACY_TRADE_COLLECTION not in db.users["u1"]
     assert repository.list_trades("u1", "Main")[0]["id"] == trade["id"]
     updated = repository.update_trade(
         "u1",
@@ -85,55 +94,6 @@ def test_repository_crud_contract():
     assert repository.update_trade("u1", "missing", {"trade_time": date.today()}) is None
     assert repository.delete_trade("u1", "missing") is False
     assert repository.delete_trade("u1", trade["id"]) is True
-
-    schedule = repository.create_recurring_transaction(
-        "u1",
-        {
-            "account": "Main",
-            "action": "Deposit",
-            "amount": 100,
-            "description": "Salary",
-            "category": "Salary",
-            "day_of_month": 1,
-            "start_date": date(2026, 1, 1),
-            "end_date": None,
-        },
-    )
-    assert repository.list_recurring_transactions("u1", "Main")[0]["id"] == schedule["id"]
-    assert isinstance(schedule["start_date"], datetime)
-    assert schedule["end_date"] is None
-    updated_schedule = repository.update_recurring_transaction(
-        "u1",
-        schedule["id"],
-        {
-            "account": "Main",
-            "action": "Withdraw",
-            "amount": 25,
-            "description": "Subscription",
-            "category": "Entertainment",
-            "day_of_month": 5,
-            "start_date": date(2026, 1, 1),
-            "end_date": None,
-        },
-    )
-    assert updated_schedule["description"] == "Subscription"
-    assert updated_schedule["active"] is True
-    assert isinstance(updated_schedule["start_date"], datetime)
-    assert repository.update_recurring_transaction("u1", "missing", {}) is None
-    recurring_trade = repository.create_recurring_trade(
-        "u1",
-        "scheduled-1",
-        {"account": "Main", "trade_time": date(2026, 1, 1), "action": "Deposit", "pnl": 100},
-    )
-    assert recurring_trade["id"] == "scheduled-1"
-    assert repository.create_recurring_trade(
-        "u1",
-        "scheduled-1",
-        {"account": "Main", "trade_time": date(2026, 1, 1), "action": "Deposit", "pnl": 100},
-    ) is None
-    assert repository.get_trade("u1", "scheduled-1")["account"] == "Main"
-    assert repository.delete_recurring_transaction("u1", schedule["id"]) is True
-    assert repository.delete_recurring_transaction("u1", "missing") is False
 
     asset = repository.create_asset(
         "u1", {"account": "Main", "symbol": "btc", "quantity": 2, "unit": "units", "display_quantity": None}
@@ -189,17 +149,8 @@ def test_delete_account_removes_related_portfolio_records():
         "u1",
         {"account": "Keep", "trade_time": date(2026, 1, 1), "action": "Deposit", "pnl": 20},
     )
-    repository.create_recurring_transaction(
-        "u1",
-        {
-            "account": "Cleanup",
-            "action": "Deposit",
-            "amount": 10,
-            "description": "Transfer",
-            "category": "Transfer",
-            "day_of_month": 1,
-            "start_date": date(2026, 1, 1),
-        },
+    repository._collection("u1", "recurring_transactions").document("schedule-1").set(
+        {"account": "Cleanup", "description": "Transfer"}
     )
     repository.create_asset(
         "u1",
@@ -209,8 +160,36 @@ def test_delete_account_removes_related_portfolio_records():
     assert repository.delete_account("u1", "Cleanup") is True
     assert repository.get_account("u1", "Cleanup") is None
     assert repository.list_trades("u1", "Cleanup") == []
-    assert repository.list_recurring_transactions("u1", "Cleanup") == []
+    assert repository._collection("u1", "recurring_transactions").document("schedule-1").get().exists is False
     assert repository.list_assets("u1", "Cleanup") == []
     assert [account["name"] for account in repository.list_accounts("u1")] == ["Keep"]
     assert len(repository.list_trades("u1", "Keep")) == 1
     assert repository.delete_account("u1", "Cleanup") is False
+
+
+def test_repository_reads_legacy_trades_while_writing_new_ledger_entries():
+    db = Database()
+    repository = PortfolioRepository(db)
+    repository._legacy_trade_collection("u1").document("legacy-1").set({
+        "account": "Main",
+        "trade_time": datetime(2026, 1, 1, tzinfo=UTC),
+        "action": "Trade",
+        "symbol": "BTC",
+        "pnl": 10,
+    })
+
+    created = repository.create_trade(
+        "u1",
+        {"account": "Main", "trade_time": date(2026, 1, 2), "action": "Trade", "symbol": "ETH", "pnl": 20},
+    )
+
+    assert created["id"] in db.users[LEDGER_COLLECTION]
+    assert [row["id"] for row in repository.list_trades("u1", "Main")] == [created["id"], "legacy-1"]
+    updated = repository.update_trade(
+        "u1",
+        "legacy-1",
+        {"trade_time": date(2026, 1, 3), "action": "Trade", "symbol": "SOL", "pnl": 30},
+    )
+    assert updated["symbol"] == "SOL"
+    assert repository.delete_trade("u1", "legacy-1") is True
+    assert repository.get_trade("u1", "legacy-1") is None

@@ -1,5 +1,8 @@
 name: CI
 
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
@@ -48,7 +51,12 @@ jobs:
           cache-dependency-path: backend/pyproject.toml
       - name: Install
         working-directory: backend
-        run: pip install -e ".[dev]"
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      - name: Audit dependencies
+        working-directory: backend
+        run: pip-audit --skip-editable
       - name: Lint
         working-directory: backend
         run: ruff check .
@@ -84,6 +92,9 @@ jobs:
       - name: Install
         working-directory: frontend
         run: npm ci
+      - name: Audit production dependencies
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
       - name: Lint
         working-directory: frontend
         run: npm run lint

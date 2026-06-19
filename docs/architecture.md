@@ -66,7 +66,7 @@ flowchart LR
     Admin --> FirebaseAuth
     Repositories --> Firestore[(Firestore)]
     Repositories --> Timescale[(TimescaleDB)]
-    Worker[Python market worker] --> Services
+    Sync[GitHub Actions or CLI sync] --> Services
     Services --> Providers[Market-data providers]
 ```
 
@@ -150,19 +150,8 @@ flowchart TD
     Select -- No --> Create[Create account]
     Create --> Workspace
     Select -- Yes --> Workspace[Open account workspace]
-    Workspace --> Type{Account type}
-    Type -- Trading account --> Trading[Record trade, deposit, or withdrawal]
-    Type -- Savings --> Savings[Record described deposit or withdrawal]
-    Type -- Bank account --> Bank[Record categorized deposit or withdrawal]
-    Bank --> Schedule{Recurring?}
-    Schedule -- Yes --> Rule[Store monthly rule]
-    Schedule -- No --> Entry
-    Rule --> Reconcile[Compare rule with current local date]
-    Reconcile --> Entry[Create idempotent due transaction]
+    Workspace --> Trading[Record trade, deposit, or withdrawal]
     Trading --> Normalize[Normalize symbol and cash sign]
-    Savings --> Normalize
-    Bank --> Normalize
-    Entry --> Normalize
     Normalize --> StoreTrade[Store ledger entry in Firestore]
     StoreTrade --> Analytics[Recalculate balance and performance]
     Workspace --> Aggregate[Aggregate accounts sharing selected currency]
@@ -241,9 +230,9 @@ All documents are nested under `users/{firebaseUid}`. Firestore client rules den
 
 Portfolio data is stored in these Firestore paths:
 
-- `users/{firebaseUid}/accounts/{accountId}` for savings, bank, and trading accounts
-- `users/{firebaseUid}/trades/{transactionId}` for deposits, withdrawals, and trades
-- `users/{firebaseUid}/recurring_transactions/{automationId}` for bank-account automations
+- `users/{firebaseUid}/accounts/{accountId}` for trading accounts
+- `users/{firebaseUid}/ledger_entries/{transactionId}` for deposits, withdrawals, and trades
+- `users/{firebaseUid}/trades/{transactionId}` for legacy ledger entries retained during migration
 - `users/{firebaseUid}/investments/{investmentId}` for investment positions
 
 ### TimescaleDB

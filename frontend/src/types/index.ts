@@ -1,4 +1,4 @@
-export type AccountType = "Savings" | "Bank Account" | "Trading Account";
+export type AccountType = "Trading Account";
 export type CurrencyCode = "EUR" | "USD" | "GBP" | "CHF" | "JPY" | "CAD" | "AUD";
 export type ActionType = "Trade" | "Deposit" | "Withdraw";
 export type TransactionCategory =
@@ -58,20 +58,6 @@ export interface Trade {
   recurring_schedule_id?: string | null;
 }
 
-export interface RecurringTransaction {
-  id: string;
-  account: string;
-  action: "Deposit" | "Withdraw";
-  amount: number;
-  description: string;
-  category: TransactionCategory;
-  day_of_month: number;
-  start_date: string;
-  end_date?: string | null;
-  active: boolean;
-  created_at?: string;
-}
-
 export interface Asset {
   id: string;
   account: string;
@@ -95,6 +81,7 @@ export interface DashboardSummary {
   average_trade: number;
   best_trade: number;
   equity_curve: Array<{ date: string; balance: number }>;
+  daily_pnl: Array<{ date: string; pnl: number; trade_count: number }>;
   accounts: Array<{
     name: string;
     type: AccountType;

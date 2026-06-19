@@ -11,7 +11,7 @@ interface RiskCalculatorProps {
 }
 
 export function RiskCalculator({ initialBalance, currency = "USD" }: RiskCalculatorProps) {
-  const [portfolio, setPortfolio] = useState(Math.max(initialBalance, 0));
+  const portfolio = Math.max(initialBalance, 0);
   const [risk, setRisk] = useState(1);
   const [stop, setStop] = useState(2);
   const [leverage, setLeverage] = useState(3);
@@ -37,8 +37,8 @@ export function RiskCalculator({ initialBalance, currency = "USD" }: RiskCalcula
       </div>
       <div className="form-grid five">
         <label>
-          <span>Portfolio</span>
-          <input type="number" min="0" value={portfolio} onChange={(event) => setPortfolio(Number(event.target.value))} />
+          <span>Portfolio balance</span>
+          <input className="readonly-balance" readOnly type="number" min="0" value={portfolio} />
         </label>
         <label>
           <span>Risk %</span>

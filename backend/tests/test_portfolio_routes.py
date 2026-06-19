@@ -8,7 +8,6 @@ from app.api.routes import portfolio
 from app.models.portfolio import (
     AccountCreate,
     AssetCreate,
-    RecurringTransactionCreate,
     TradeCreate,
     TradeUpdate,
 )
@@ -27,13 +26,13 @@ class Repository:
             self.calls.append((name, args))
             if name == "list_accounts":
                 return [self.account]
-            if name in {"upsert_account", "create_trade", "create_asset", "create_recurring_transaction"}:
+            if name in {"upsert_account", "create_trade", "create_asset"}:
                 return args[-1]
             if name == "get_trade":
                 return self.trade
-            if name in {"update_trade", "update_recurring_transaction"}:
+            if name == "update_trade":
                 return self.updated
-            if name in {"delete_account", "delete_trade", "delete_asset", "delete_recurring_transaction"}:
+            if name in {"delete_account", "delete_trade", "delete_asset"}:
                 return self.deleted
             if name == "list_trades":
                 return [{"action": "Trade", "pnl": 100, "trade_time": date(2026, 1, 1)}]
@@ -41,8 +40,6 @@ class Repository:
                 return [{"id": "a1"}]
             if name == "get_account":
                 return self.account
-            if name == "list_recurring_transactions":
-                return []
             return None
         return call
 
@@ -80,60 +77,17 @@ def test_create_trade_normalizes_ledger_actions(action, symbol, pnl, expected_sy
     assert result["pnl"] == expected_pnl
 
 
-def test_cash_account_rules_require_descriptions_and_bank_categories():
+def test_non_trading_accounts_are_rejected_for_legacy_data():
     repository = Repository()
     repository.account = {"name": "Savings", "type": "Savings", "currency": "EUR"}
-    with pytest.raises(HTTPException) as description_error:
+    with pytest.raises(HTTPException) as account_type_error:
         portfolio.create_trade(
             TradeCreate(account="Savings", trade_time=date(2026, 1, 1), action="Deposit", pnl=100),
             USER,
             repository,
         )
-    assert description_error.value.status_code == 422
-
-    repository.account = {"name": "Current", "type": "Bank Account", "currency": "EUR"}
-    with pytest.raises(HTTPException) as category_error:
-        portfolio.create_trade(
-            TradeCreate(
-                account="Current",
-                trade_time=date(2026, 1, 1),
-                action="Deposit",
-                pnl=100,
-                description="Salary",
-            ),
-            USER,
-            repository,
-        )
-    assert category_error.value.status_code == 422
-
-    created = portfolio.create_trade(
-        TradeCreate(
-            account="Current",
-            trade_time=date(2026, 1, 1),
-            action="Withdraw",
-            pnl=50,
-            description="Groceries",
-            category="Groceries",
-        ),
-        USER,
-        repository,
-    )
-    assert created["pnl"] == -50
-    assert created["category"] == "Groceries"
-
-    with pytest.raises(HTTPException) as action_error:
-        portfolio.create_trade(
-            TradeCreate(
-                account="Current",
-                trade_time=date(2026, 1, 1),
-                action="Trade",
-                symbol="BTC",
-                pnl=10,
-            ),
-            USER,
-            repository,
-        )
-    assert action_error.value.status_code == 422
+    assert account_type_error.value.status_code == 422
+    assert account_type_error.value.detail == "Only Trading Accounts are supported."
 
 
 def test_trade_requires_symbol():
@@ -173,30 +127,8 @@ def test_journal_is_restricted_to_trading_accounts():
     assert "only for Trading Accounts" in error.value.detail
 
 
-def test_recurring_and_total_dashboard_routes(monkeypatch):
+def test_total_dashboard_route(monkeypatch):
     repository = Repository()
-    repository.account = {"name": "Current", "starting_balance": 100, "type": "Bank Account", "currency": "EUR"}
-    payload = RecurringTransactionCreate(
-        account="Current",
-        action="Deposit",
-        amount=100,
-        description="Salary",
-        category="Salary",
-        day_of_month=1,
-        start_date=date(2026, 1, 1),
-    )
-    assert portfolio.create_recurring_transaction(payload, USER, repository)["description"] == "Salary"
-    repository.updated = {
-        "id": "r1",
-        **payload.model_dump(),
-        "active": True,
-    }
-    assert portfolio.update_recurring_transaction("r1", payload, USER, repository)["id"] == "r1"
-    assert portfolio.recurring_transactions(USER, repository, "Current") == []
-    assert portfolio.delete_recurring_transaction("r1", USER, repository) == {
-        "message": "Recurring transaction deleted."
-    }
-
     monkeypatch.setattr(portfolio, "aggregate_dashboard_summary", lambda accounts, trades, currency: {
         "accounts": accounts,
         "trades": trades,
@@ -204,20 +136,6 @@ def test_recurring_and_total_dashboard_routes(monkeypatch):
     })
     result = portfolio.total_dashboard(USER, repository, "eur")
     assert result["currency"] == "EUR"
-
-    repository.account["type"] = "Savings"
-    with pytest.raises(HTTPException) as error:
-        portfolio.create_recurring_transaction(payload, USER, repository)
-    assert error.value.status_code == 422
-    with pytest.raises(HTTPException) as error:
-        portfolio.update_recurring_transaction("r1", payload, USER, repository)
-    assert error.value.status_code == 422
-
-    repository.account["type"] = "Bank Account"
-    repository.updated = None
-    with pytest.raises(HTTPException) as error:
-        portfolio.update_recurring_transaction("missing", payload, USER, repository)
-    assert error.value.status_code == 404
 
 
 def test_missing_updates_deletes_and_accounts_raise_not_found():
@@ -232,21 +150,6 @@ def test_missing_updates_deletes_and_accounts_raise_not_found():
         lambda: portfolio.delete_trade("missing", USER, repository),
         lambda: portfolio.delete_account("missing", USER, repository),
         lambda: portfolio.delete_asset("missing", USER, repository),
-        lambda: portfolio.update_recurring_transaction(
-            "missing",
-            RecurringTransactionCreate(
-                account="Main",
-                action="Deposit",
-                amount=10,
-                description="Salary",
-                category="Salary",
-                day_of_month=1,
-                start_date=date(2026, 1, 1),
-            ),
-            USER,
-            repository,
-        ),
-        lambda: portfolio.delete_recurring_transaction("missing", USER, repository),
         lambda: portfolio.dashboard("missing", USER, repository),
         lambda: portfolio.journal("missing", USER, repository),
     ):

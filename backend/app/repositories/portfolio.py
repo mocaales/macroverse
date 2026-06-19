@@ -6,6 +6,9 @@ from google.cloud.firestore_v1 import Client, CollectionReference, DocumentSnaps
 
 from app.models.portfolio import normalize_account_type
 
+LEDGER_COLLECTION = "ledger_entries"
+LEGACY_TRADE_COLLECTION = "trades"
+
 
 def _normalize_datetime(value: datetime | date | None) -> datetime | None:
     if value is None:
@@ -33,13 +36,6 @@ def _normalize_account(row: dict) -> dict:
     return normalized
 
 
-def _normalize_recurring_payload(payload: dict) -> dict:
-    normalized = {**payload}
-    normalized["start_date"] = _normalize_datetime(normalized["start_date"])
-    normalized["end_date"] = _normalize_datetime(normalized.get("end_date"))
-    return normalized
-
-
 class PortfolioRepository:
     def __init__(self, db: Client) -> None:
         self.db = db
@@ -49,6 +45,19 @@ class PortfolioRepository:
 
     def _collection(self, uid: str, name: str) -> CollectionReference:
         return self._user(uid).collection(name)
+
+    def _ledger_collection(self, uid: str) -> CollectionReference:
+        return self._collection(uid, LEDGER_COLLECTION)
+
+    def _legacy_trade_collection(self, uid: str) -> CollectionReference:
+        return self._collection(uid, LEGACY_TRADE_COLLECTION)
+
+    def _ledger_reference(self, uid: str, trade_id: str):
+        reference = self._ledger_collection(uid).document(trade_id)
+        if reference.get().exists:
+            return reference
+        legacy_reference = self._legacy_trade_collection(uid).document(trade_id)
+        return legacy_reference if legacy_reference.get().exists else reference
 
     def ensure_user(self, uid: str, email: str) -> None:
         self._user(uid).set(
@@ -89,7 +98,7 @@ class PortfolioRepository:
         if not reference.get().exists:
             return False
 
-        for collection_name in ("trades", "recurring_transactions", "investments"):
+        for collection_name in (LEDGER_COLLECTION, LEGACY_TRADE_COLLECTION, "recurring_transactions", "investments"):
             collection = self._collection(uid, collection_name)
             for snapshot in collection.stream():
                 row = snapshot.to_dict() or {}
@@ -99,7 +108,15 @@ class PortfolioRepository:
         return True
 
     def list_trades(self, uid: str, account: str | None = None) -> list[dict]:
-        rows = [_document(snapshot) for snapshot in self._collection(uid, "trades").stream()]
+        rows_by_id = {
+            snapshot.id: _document(snapshot)
+            for snapshot in self._legacy_trade_collection(uid).stream()
+        }
+        rows_by_id.update({
+            snapshot.id: _document(snapshot)
+            for snapshot in self._ledger_collection(uid).stream()
+        })
+        rows = list(rows_by_id.values())
         if account:
             rows = [row for row in rows if row.get("account") == account]
         minimum = datetime.min.replace(tzinfo=UTC)
@@ -112,29 +129,16 @@ class PortfolioRepository:
             "trade_time": _normalize_datetime(trade_date),
             "created_at": datetime.now(UTC),
         }
-        reference = self._collection(uid, "trades").document()
-        reference.set(record)
-        return {"id": reference.id, **record}
-
-    def create_recurring_trade(self, uid: str, identifier: str, payload: dict) -> dict | None:
-        reference = self._collection(uid, "trades").document(identifier)
-        if reference.get().exists:
-            return None
-        trade_date = payload.pop("trade_time")
-        record = {
-            **payload,
-            "trade_time": _normalize_datetime(trade_date),
-            "created_at": datetime.now(UTC),
-        }
+        reference = self._ledger_collection(uid).document()
         reference.set(record)
         return {"id": reference.id, **record}
 
     def get_trade(self, uid: str, trade_id: str) -> dict | None:
-        snapshot = self._collection(uid, "trades").document(trade_id).get()
+        snapshot = self._ledger_reference(uid, trade_id).get()
         return _document(snapshot) if snapshot.exists else None
 
     def update_trade(self, uid: str, trade_id: str, payload: dict) -> dict | None:
-        reference = self._collection(uid, "trades").document(trade_id)
+        reference = self._ledger_reference(uid, trade_id)
         if not reference.get().exists:
             return None
         trade_date = payload.pop("trade_time")
@@ -148,45 +152,15 @@ class PortfolioRepository:
         return _document(reference.get())
 
     def delete_trade(self, uid: str, trade_id: str) -> bool:
-        reference = self._collection(uid, "trades").document(trade_id)
-        if not reference.get().exists:
+        references = [
+            self._ledger_collection(uid).document(trade_id),
+            self._legacy_trade_collection(uid).document(trade_id),
+        ]
+        existing = [reference for reference in references if reference.get().exists]
+        if not existing:
             return False
-        reference.delete()
-        return True
-
-    def list_recurring_transactions(self, uid: str, account: str | None = None) -> list[dict]:
-        rows = [_document(snapshot) for snapshot in self._collection(uid, "recurring_transactions").stream()]
-        if account:
-            rows = [row for row in rows if row.get("account") == account]
-        minimum = datetime.min.replace(tzinfo=UTC)
-        return sorted(rows, key=lambda row: row.get("created_at") or minimum, reverse=True)
-
-    def create_recurring_transaction(self, uid: str, payload: dict) -> dict:
-        record = {
-            **_normalize_recurring_payload(payload),
-            "active": True,
-            "created_at": datetime.now(UTC),
-        }
-        reference = self._collection(uid, "recurring_transactions").document()
-        reference.set(record)
-        return {"id": reference.id, **record}
-
-    def update_recurring_transaction(self, uid: str, schedule_id: str, payload: dict) -> dict | None:
-        reference = self._collection(uid, "recurring_transactions").document(schedule_id)
-        snapshot = reference.get()
-        if not snapshot.exists:
-            return None
-        reference.update({
-            **_normalize_recurring_payload(payload),
-            "updated_at": firestore.SERVER_TIMESTAMP,
-        })
-        return _document(reference.get())
-
-    def delete_recurring_transaction(self, uid: str, schedule_id: str) -> bool:
-        reference = self._collection(uid, "recurring_transactions").document(schedule_id)
-        if not reference.get().exists:
-            return False
-        reference.delete()
+        for reference in existing:
+            reference.delete()
         return True
 
     def list_assets(self, uid: str, account: str | None = None) -> list[dict]:

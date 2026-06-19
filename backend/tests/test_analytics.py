@@ -22,7 +22,13 @@ def test_dashboard_summary_preserves_balance_and_trade_metrics():
     assert summary["winning_trades"] == 1
     assert summary["win_rate"] == 50
     assert summary["average_trade"] == 30
-    assert len(summary["equity_curve"]) == 4
+    assert [point["balance"] for point in summary["equity_curve"][:5]] == [1000, 1100, 1060, 1560, 1560]
+    assert len(summary["equity_curve"]) >= 5
+    assert summary["daily_pnl"][:3] == [
+        {"date": datetime(2026, 1, 2, tzinfo=UTC), "pnl": 100, "trade_count": 1},
+        {"date": datetime(2026, 1, 3, tzinfo=UTC), "pnl": -40, "trade_count": 1},
+        {"date": datetime(2026, 1, 4, tzinfo=UTC), "pnl": 0, "trade_count": 0},
+    ]
 
 
 def test_journal_summary_uses_trades_for_win_rate():
@@ -93,7 +99,8 @@ def test_aggregate_dashboard_combines_only_the_selected_currency():
     assert summary["account_count"] == 2
     assert summary["total_entries"] == 2
     assert summary["trade_count"] == 0
-    assert [point["balance"] for point in summary["equity_curve"]] == [100, 300, 350, 325]
+    assert [point["balance"] for point in summary["equity_curve"][:4]] == [100, 300, 350, 325]
+    assert summary["equity_curve"][4]["balance"] == 325
     assert summary["accounts"] == [
         {"name": "Current", "type": "Trading Account", "currency": "EUR", "balance": 150},
         {"name": "Savings", "type": "Trading Account", "currency": "EUR", "balance": 175},

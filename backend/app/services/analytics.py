@@ -6,15 +6,49 @@ def _day_start(value: date | datetime) -> datetime:
     return datetime.combine(day, time.min, tzinfo=UTC)
 
 
-def _balance_curve(events: list[tuple[date | datetime, float]]) -> list[dict]:
+def _daily_range(start: datetime, end: datetime):
+    cursor = start
+    while cursor <= end:
+        yield cursor
+        cursor += timedelta(days=1)
+
+
+def _balance_curve(events: list[tuple[date | datetime, float]], through: datetime | None = None) -> list[dict]:
+    if not events:
+        return []
     balance = 0.0
-    daily_balances: dict[datetime, float] = {}
+    daily_amounts: dict[datetime, float] = {}
     for event_date, amount in sorted(events, key=lambda item: item[0]):
-        balance += amount
-        daily_balances[_day_start(event_date)] = balance
+        day = _day_start(event_date)
+        daily_amounts[day] = daily_amounts.get(day, 0.0) + amount
+    first_day = min(daily_amounts)
+    last_day = max(_day_start(through or datetime.now(UTC)), max(daily_amounts))
+    curve = []
+    for event_day in _daily_range(first_day, last_day):
+        balance += daily_amounts.get(event_day, 0.0)
+        curve.append({"date": event_day, "balance": balance})
+    return curve
+
+
+def _daily_pnl(trades: list[dict], through: datetime | None = None) -> list[dict]:
+    trade_days: dict[datetime, dict[str, float | int]] = {}
+    closed = [trade for trade in trades if trade.get("action") == "Trade"]
+    if not closed:
+        return []
+    for trade in closed:
+        day = _day_start(trade["trade_time"])
+        current = trade_days.setdefault(day, {"pnl": 0.0, "trade_count": 0})
+        current["pnl"] = float(current["pnl"]) + float(trade["pnl"])
+        current["trade_count"] = int(current["trade_count"]) + 1
+    first_day = min(trade_days)
+    last_day = max(_day_start(through or datetime.now(UTC)), max(trade_days))
     return [
-        {"date": event_date, "balance": daily_balances[event_date]}
-        for event_date in sorted(daily_balances)
+        {
+            "date": event_day,
+            "pnl": float(trade_days.get(event_day, {}).get("pnl", 0)),
+            "trade_count": int(trade_days.get(event_day, {}).get("trade_count", 0)),
+        }
+        for event_day in _daily_range(first_day, last_day)
     ]
 
 
@@ -46,6 +80,7 @@ def dashboard_summary(account: dict, trades: list[dict]) -> dict:
         "average_trade": (sum(trade_pnls) / len(trade_pnls)) if trade_pnls else 0,
         "best_trade": max(trade_pnls, default=0),
         "equity_curve": curve,
+        "daily_pnl": _daily_pnl(ordered),
         "accounts": [],
     }
 
@@ -94,6 +129,7 @@ def aggregate_dashboard_summary(accounts: list[dict], trades: list[dict], curren
         "average_trade": (sum(trade_pnls) / len(trade_pnls)) if trade_pnls else 0,
         "best_trade": max(trade_pnls, default=0),
         "equity_curve": curve,
+        "daily_pnl": _daily_pnl(selected_trades),
         "accounts": account_balances,
     }
 

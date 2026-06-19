@@ -66,7 +66,6 @@ Create a Render Blueprint from the repository root. The committed `render.yaml` 
 | Variable | Required | Notes |
 | --- | --- | --- |
 | `ENVIRONMENT` | Yes | Set to `production` |
-| `APP_TIMEZONE` | No | IANA timezone used for recurring transactions; defaults to `Europe/Ljubljana` |
 | `CORS_ORIGINS` | Yes | Exact HTTPS frontend origins, comma-separated |
 | `ADMIN_EMAIL` | Yes | Sole Firebase account granted the administrator role |
 | `FIREBASE_PROJECT_ID` | Yes | Firebase project identifier |

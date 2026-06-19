@@ -51,11 +51,9 @@ describe("AppShell", () => {
     expect(screen.queryByText("Close mocked dialog")).not.toBeInTheDocument();
   });
 
-  it("shows the authenticated email without journal access for non-trading accounts", async () => {
+  it("shows the authenticated email without journal access before an account exists", async () => {
     auth.user = { uid: "u-1", email: "user@example.com", role: "user", email_verified: true };
-    portfolioApi.accounts.mockResolvedValue([
-      { name: "Current", starting_balance: 100, type: "Bank Account", currency: "EUR" }
-    ]);
+    portfolioApi.accounts.mockResolvedValue([]);
     renderShell();
     expect(screen.getByText("user@example.com")).toBeInTheDocument();
     expect(screen.queryByText("Admin")).not.toBeInTheDocument();

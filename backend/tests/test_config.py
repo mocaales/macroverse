@@ -1,5 +1,4 @@
 import secrets
-import socket
 
 from psycopg.conninfo import conninfo_to_dict
 
@@ -11,9 +10,7 @@ def test_database_conninfo_is_built_from_postgres_environment():
     database = secrets.token_hex(8)
     user = secrets.token_hex(8)
     password = secrets.token_urlsafe(24)
-    with socket.socket() as available_port:
-        available_port.bind(("", 0))
-        port = available_port.getsockname()[1]
+    port = secrets.randbelow(64_511) + 1_024
     settings = Settings(
         _env_file=None,
         postgres_host=host,

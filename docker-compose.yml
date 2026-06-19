@@ -42,31 +42,7 @@ services:
       timescaledb:
         condition: service_healthy
     ports:
-      - "${BACKEND_PORT:-8000}:8000"
-    restart: unless-stopped
-
-  market-sync:
-    build:
-      context: ./backend
-    command: ["python", "-m", "app.worker"]
-    healthcheck:
-      disable: true
-    environment:
-      MARKET_DATABASE_URL: "${MARKET_DATABASE_URL}"
-      POSTGRES_HOST: "${POSTGRES_HOST}"
-      POSTGRES_PORT: "${POSTGRES_PORT}"
-      POSTGRES_DB: "${POSTGRES_DB}"
-      POSTGRES_USER: "${POSTGRES_USER}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
-      MARKET_SYNC_INTERVAL_SECONDS: "${MARKET_SYNC_INTERVAL_SECONDS:-3600}"
-      MARKET_DATABASE_BATCH_SIZE: "${MARKET_DATABASE_BATCH_SIZE:-25}"
-      COINMETRICS_API_BASE_URL: "${COINMETRICS_API_BASE_URL:-https://community-api.coinmetrics.io/v4}"
-      FRED_API_KEY: "${FRED_API_KEY:-}"
-      CRYPTOQUANT_ACCESS_TOKEN: "${CRYPTOQUANT_ACCESS_TOKEN:-}"
-      CRYPTOQUANT_SERIES_JSON: "${CRYPTOQUANT_SERIES_JSON:-[]}"
-    depends_on:
-      timescaledb:
-        condition: service_healthy
+      - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     restart: unless-stopped
 
   timescaledb:
@@ -78,7 +54,7 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
       POSTGRES_PORT: "${POSTGRES_PORT}"
     ports:
-      - "${POSTGRES_PORT}:${POSTGRES_PORT}"
+      - "127.0.0.1:${POSTGRES_PORT}:${POSTGRES_PORT}"
     volumes:
       - timescale_data:/var/lib/postgresql/data
     healthcheck:

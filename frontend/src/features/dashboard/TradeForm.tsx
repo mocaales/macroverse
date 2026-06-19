@@ -23,7 +23,22 @@ export function TradeForm({
   const [action, setAction] = useState<ActionType>("Trade");
   const [direction, setDirection] = useState("Long");
   const [symbol, setSymbol] = useState("");
-  const [amount, setAmount] = useState(0);
+  const [amount, setAmount] = useState("");
+  const [tradeResult, setTradeResult] = useState<"profit" | "loss" | "flat">("profit");
+
+  const numericAmount = Math.abs(Number(amount) || 0);
+  const displayedAmount = action === "Trade" && tradeResult === "loss" && amount
+    ? `-${numericAmount}`
+    : amount;
+  const pnl = action === "Trade"
+    ? tradeResult === "loss"
+      ? -numericAmount
+      : tradeResult === "flat"
+        ? 0
+        : numericAmount
+    : action === "Withdraw"
+      ? -numericAmount
+      : numericAmount;
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -33,9 +48,9 @@ export function TradeForm({
       action,
       type: action === "Trade" ? direction : undefined,
       symbol: action === "Trade" ? symbol.toUpperCase() : "CASH",
-      pnl: action === "Withdraw" ? -Math.abs(amount) : amount
+      pnl
     });
-    setAmount(0);
+    setAmount("");
   };
 
   return (
@@ -69,14 +84,25 @@ export function TradeForm({
           </label>
         </div>
       )}
+      {action === "Trade" && (
+        <label>
+          <span>Trade result</span>
+          <select value={tradeResult} onChange={(event) => setTradeResult(event.target.value as typeof tradeResult)}>
+            <option value="profit">Profitable</option>
+            <option value="loss">Not profitable</option>
+            <option value="flat">Break-even</option>
+          </select>
+        </label>
+      )}
       <label>
         <span>{action === "Trade" ? "Realised P&L" : "Amount"}</span>
         <input
           type="number"
           step="0.01"
           min={action === "Trade" ? undefined : 0}
-          value={amount}
-          onChange={(event) => setAmount(Number(event.target.value))}
+          placeholder={action === "Trade" && tradeResult === "loss" ? "-0.00" : "0.00"}
+          value={displayedAmount}
+          onChange={(event) => setAmount(event.target.value.replace("-", ""))}
         />
       </label>
       <button className="button primary" disabled={busy}>

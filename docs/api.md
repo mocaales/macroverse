@@ -30,10 +30,6 @@ The response from `/auth/me` includes a server-derived `role` of `admin` or `use
 | `POST` | `/portfolio/trades` | Yes | Create a trade, deposit, or withdrawal |
 | `PUT` | `/portfolio/trades/{trade_id}` | Yes | Update a ledger entry |
 | `DELETE` | `/portfolio/trades/{trade_id}` | Yes | Delete a ledger entry |
-| `GET` | `/portfolio/recurring-transactions` | Yes | List recurring bank transactions |
-| `POST` | `/portfolio/recurring-transactions` | Yes | Create recurring bank automation |
-| `PUT` | `/portfolio/recurring-transactions/{id}` | Yes | Edit recurring bank automation |
-| `DELETE` | `/portfolio/recurring-transactions/{id}` | Yes | Delete recurring bank automation |
 | `GET` | `/portfolio/dashboard` | Yes | Return the aggregate dashboard and live per-account balances for one currency |
 | `GET` | `/portfolio/dashboard/{account}` | Yes | Return account performance summary |
 | `GET` | `/portfolio/journal/{account}/summary` | Yes | Return journal summary |
@@ -96,29 +92,7 @@ curl -X POST \
   http://localhost:8000/api/v1/portfolio/trades
 ```
 
-Savings and bank accounts reject trade actions. Their deposits and withdrawals require a description; bank transactions additionally require a category. Trading accounts preserve the existing trade, deposit, and withdrawal workflow.
-
-### Create a recurring bank transaction
-
-```bash
-curl -X POST \
-  -H "Authorization: Bearer ${FIREBASE_ID_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "account":"Primary bank",
-    "action":"Deposit",
-    "amount":100,
-    "description":"Monthly salary allocation",
-    "category":"Salary",
-    "day_of_month":1,
-    "start_date":"2026-07-01"
-  }' \
-  http://localhost:8000/api/v1/portfolio/recurring-transactions
-```
-
-Due occurrences are materialized immediately when automation is created and whenever portfolio data is requested afterward. Each generated transaction uses a deterministic monthly identifier, so concurrent refreshes cannot create duplicate ledger entries.
-
-Editing an automation preserves its identifier and changes the rules used for subsequent synchronization. Deleting an automation stops future occurrences; transactions already materialized in the ledger remain as historical records.
+Only trading accounts are supported. Each trading account can record trades, deposits, and withdrawals.
 
 Account balances are derived from the persisted starting balance and Firestore ledger entries. The aggregate dashboard returns these live balances for the Portfolio account list; it does not rely on a separately stored balance field that could become stale.
 

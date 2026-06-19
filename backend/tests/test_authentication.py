@@ -102,6 +102,11 @@ def test_verified_configured_email_is_the_only_admin(monkeypatch):
     assert user.role == "admin"
     assert dependencies.get_current_admin(user) is user
 
+    token["email_verified"] = False
+    unverified_admin = dependencies.get_current_user(credentials)
+    assert unverified_admin.role == "user"
+
+    token["email_verified"] = True
     token["email"] = "user@example.com"
     normal_user = dependencies.get_current_user(credentials)
     assert normal_user.role == "user"

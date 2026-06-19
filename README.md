@@ -25,7 +25,7 @@ Macroverse is a full-stack financial analytics application. It combines authenti
 - Authenticate users with Firebase Authentication.
 - Assign one configured account as administrator and provide user-account management.
 - Persist private user data in Cloud Firestore and shared market data in TimescaleDB.
-- Synchronize provider data incrementally through a worker or scheduled GitHub Action.
+- Synchronize provider data incrementally through scheduled GitHub Actions or manual CLI runs.
 
 ## Technology
 
@@ -49,8 +49,8 @@ flowchart LR
     API -->|Verify token| FirebaseAuth
     API -->|Private portfolio data| Firestore[(Cloud Firestore)]
     API -->|Market queries| Timescale[(TimescaleDB)]
-    Worker[Market sync worker] -->|FRED / Coin Metrics / CryptoQuant| Providers[Data providers]
-    Worker -->|Upsert observations| Timescale
+    Sync[Scheduled sync workflow or CLI] -->|FRED / Coin Metrics / CryptoQuant| Providers[Data providers]
+    Sync -->|Upsert observations| Timescale
 ```
 
 The backend is the only component allowed to access Firestore documents. Browser requests carry Firebase ID tokens, which FastAPI verifies before resolving a user-specific document path. Market data is stored separately because it is shared, append-oriented time-series data.

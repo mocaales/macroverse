@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -16,9 +16,7 @@ const auth = vi.hoisted(() => ({
 const portfolioApi = vi.hoisted(() => ({
   accounts: vi.fn(), createAccount: vi.fn(), deleteAccount: vi.fn(), trades: vi.fn(), createTrade: vi.fn(),
   updateTrade: vi.fn(), deleteTrade: vi.fn(), assets: vi.fn(), createAsset: vi.fn(),
-  deleteAsset: vi.fn(), dashboard: vi.fn(), totalDashboard: vi.fn(), journalSummary: vi.fn(),
-  recurringTransactions: vi.fn(), createRecurringTransaction: vi.fn(), updateRecurringTransaction: vi.fn(),
-  deleteRecurringTransaction: vi.fn()
+  deleteAsset: vi.fn(), dashboard: vi.fn(), totalDashboard: vi.fn(), journalSummary: vi.fn()
 }));
 const chartsApi = vi.hoisted(() => ({
   charts: vi.fn(), favourites: vi.fn(), toggleFavourite: vi.fn(), series: vi.fn()
@@ -32,6 +30,14 @@ vi.mock("../components/Plot", () => ({
 }));
 vi.mock("../components/BalanceLineChart", () => ({
   BalanceLineChart: () => <div data-testid="balance-chart">TradingView balance chart</div>
+}));
+vi.mock("../components/DailyPnlCalendar", () => ({
+  DailyPnlCalendar: () => <div data-testid="daily-pnl-calendar">Daily P&L calendar</div>
+}));
+vi.mock("../components/MonthlyPerformanceChart", () => ({
+  MonthlyPerformanceChart: ({ points }: { points: Array<{ month: string }> }) => (
+    <div data-testid="monthly-performance-chart">{points.map((point) => point.month).join(",")}</div>
+  )
 }));
 vi.mock("../components/YearToDateRoiChart", () => ({
   YearToDateRoiChart: () => <div data-testid="ytd-chart">Professional YTD chart</div>
@@ -54,11 +60,10 @@ describe("application pages", () => {
     portfolioApi.accounts.mockResolvedValue([]);
     portfolioApi.trades.mockResolvedValue([]);
     portfolioApi.assets.mockResolvedValue([]);
-    portfolioApi.recurringTransactions.mockResolvedValue([]);
     const summary = {
       currency: "EUR", account_type: "All Accounts", account_count: 0, balance: 0,
       realised_pnl: 0, total_entries: 0, trade_count: 0, winning_trades: 0,
-      win_rate: 0, average_trade: 0, best_trade: 0, equity_curve: []
+      win_rate: 0, average_trade: 0, best_trade: 0, equity_curve: [], daily_pnl: []
     };
     portfolioApi.dashboard.mockResolvedValue(summary);
     portfolioApi.totalDashboard.mockResolvedValue(summary);
@@ -102,10 +107,43 @@ describe("application pages", () => {
     portfolioApi.accounts.mockResolvedValue([{ name: "Trading", starting_balance: 1000, type: "Trading Account", currency: "USD" }]);
     portfolioApi.dashboard.mockResolvedValue({
       currency: "USD", account_type: "Trading Account", account_count: 1, balance: 1100,
-      realised_pnl: 100, total_entries: 1, trade_count: 1, winning_trades: 1,
-      win_rate: 100, average_trade: 100, best_trade: 100,
-      equity_curve: [{ date: "2026-01-01", balance: 1100 }]
+      realised_pnl: 60, total_entries: 4, trade_count: 3, winning_trades: 1,
+      win_rate: 33.3, average_trade: 20, best_trade: 100,
+      equity_curve: [
+        { date: "2025-12-01", balance: 1000 },
+        { date: "2026-01-01", balance: 1200 },
+        { date: "2026-01-15", balance: 900 },
+        { date: "2026-01-31", balance: 1100 }
+      ],
+      daily_pnl: [
+        { date: "2026-01-01", pnl: 100, trade_count: 1 },
+        { date: "2026-01-02", pnl: -40, trade_count: 1 }
+      ]
     });
+    portfolioApi.trades.mockResolvedValue([
+      {
+        id: "trade-1",
+        account: "Trading",
+        trade_time: "2026-01-01T00:00:00Z",
+        action: "Trade",
+        type: "Long",
+        symbol: "BTC",
+        pnl: 100,
+        notes: ""
+      },
+      {
+        id: "trade-2", account: "Trading", trade_time: "2026-01-02T00:00:00Z",
+        action: "Trade", type: "Short", symbol: "ETH", pnl: -40, notes: ""
+      },
+      {
+        id: "trade-3", account: "Trading", trade_time: "2026-01-03T00:00:00Z",
+        action: "Trade", type: "Long", symbol: "BTC", pnl: 0, notes: ""
+      },
+      {
+        id: "cash-1", account: "Trading", trade_time: "2026-01-04T00:00:00Z",
+        action: "Deposit", type: null, symbol: "CASH", pnl: 500, notes: ""
+      }
+    ]);
     portfolioApi.createTrade.mockResolvedValue({});
     portfolioApi.createAccount.mockResolvedValue({ name: "New", starting_balance: 0, type: "Trading Account", currency: "EUR" });
     renderPage(<DashboardPage />);
@@ -113,6 +151,42 @@ describe("application pages", () => {
     fireEvent.change(screen.getByLabelText("Account"), { target: { value: "Trading" } });
     expect(await screen.findByText("Balance through time")).toBeInTheDocument();
     expect(await screen.findByTestId("balance-chart")).toBeInTheDocument();
+    expect(screen.getByTestId("daily-pnl-calendar")).toBeInTheDocument();
+    expect(await screen.findByText("Realized trading performance")).toBeInTheDocument();
+    expect(screen.getByTestId("monthly-performance-chart")).toHaveTextContent("2026-01");
+    const realisedPnlMetric = screen.getByText("Realized trade P&L").closest("article");
+    expect(realisedPnlMetric).not.toBeNull();
+    expect(realisedPnlMetric).toHaveTextContent("-$40.00");
+    const performanceMetric = screen.getByText("Performance").closest("article");
+    expect(performanceMetric).not.toBeNull();
+    await waitFor(() => expect(performanceMetric).toHaveTextContent("+22.22%"));
+    const monthlyRange = screen.getByLabelText("Monthly performance range");
+    fireEvent.click(within(monthlyRange).getByRole("button", { name: "3M" }));
+    expect(screen.getByText("What is driving performance")).toBeInTheDocument();
+    expect(screen.getByLabelText("1 wins, 1 losses, 1 break-even")).toBeInTheDocument();
+    expect(screen.getByText("2.50x")).toBeInTheDocument();
+    expect(screen.getAllByText("ETH")).toHaveLength(2);
+    expect(screen.queryByText("Ledger operations")).not.toBeInTheDocument();
+
+    const performancePeriod = screen.getByLabelText("Performance period");
+    fireEvent.click(within(performancePeriod).getByRole("button", { name: "All" }));
+    expect(performanceMetric).toHaveTextContent("+10.00%");
+    expect(realisedPnlMetric).toHaveTextContent("+$60.00");
+    expect(screen.queryByText("Max drawdown")).not.toBeInTheDocument();
+    fireEvent.click(within(performancePeriod).getByRole("button", { name: "7 Days" }));
+    expect(performanceMetric).toHaveTextContent("+0.00%");
+    expect(realisedPnlMetric).toHaveTextContent("$0.00");
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
+    fireEvent.change(screen.getByLabelText("To"), { target: { value: "2026-01-31" } });
+    expect(performanceMetric).toHaveTextContent("-8.33%");
+    expect(realisedPnlMetric).toHaveTextContent("+$60.00");
+
+    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn(() => "blob:report") });
+    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+    const clickReport = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
+    fireEvent.click(screen.getByRole("button", { name: /Download report/ }));
+    expect(URL.createObjectURL).toHaveBeenCalled();
+    expect(clickReport).toHaveBeenCalled();
 
     fireEvent.change(screen.getByLabelText("Symbol"), { target: { value: "btc" } });
     fireEvent.change(screen.getByLabelText("Realised P&L"), { target: { value: "20" } });
@@ -124,9 +198,9 @@ describe("application pages", () => {
     await waitFor(() => expect(portfolioApi.createAccount).toHaveBeenCalled());
   });
 
-  it("renders the total portfolio and bank-account automation", async () => {
+  it("renders a total portfolio containing trading accounts", async () => {
     portfolioApi.accounts.mockResolvedValue([
-      { name: "Current", starting_balance: 500, type: "Bank Account", currency: "EUR" },
+      { name: "Primary", starting_balance: 500, type: "Trading Account", currency: "EUR" },
       { name: "Broker", starting_balance: 500, type: "Trading Account", currency: "EUR" }
     ]);
     portfolioApi.totalDashboard.mockResolvedValue({
@@ -134,70 +208,40 @@ describe("application pages", () => {
       realised_pnl: 0, total_entries: 0, trade_count: 0, winning_trades: 0,
       win_rate: 0, average_trade: 0, best_trade: 0,
       equity_curve: [{ date: "2026-01-01", balance: 1000 }],
+      daily_pnl: [],
       accounts: [
-        { name: "Current", type: "Bank Account", currency: "EUR", balance: 600 },
+        { name: "Primary", type: "Trading Account", currency: "EUR", balance: 600 },
         { name: "Broker", type: "Trading Account", currency: "EUR", balance: 400 }
       ]
     });
     portfolioApi.dashboard.mockResolvedValue({
-      currency: "EUR", account_type: "Bank Account", account_count: 1, balance: 600,
-      realised_pnl: 100, total_entries: 1, trade_count: 0, winning_trades: 0,
-      win_rate: 0, average_trade: 0, best_trade: 0,
-      equity_curve: [{ date: "2026-01-01", balance: 600 }]
+      currency: "EUR", account_type: "Trading Account", account_count: 1, balance: 600,
+      realised_pnl: 100, total_entries: 1, trade_count: 1, winning_trades: 1,
+      win_rate: 100, average_trade: 100, best_trade: 100,
+      equity_curve: [{ date: "2026-01-01", balance: 600 }],
+      daily_pnl: [{ date: "2026-01-01", pnl: 100, trade_count: 1 }]
     });
     portfolioApi.trades.mockResolvedValue([{
-      id: "c1", account: "Current", trade_time: "2026-01-01", action: "Deposit",
-      symbol: "CASH", pnl: 100, notes: "", description: "Salary", category: "Salary"
+      id: "c1", account: "Primary", trade_time: "2026-01-01", action: "Trade",
+      type: "Long", symbol: "BTC", pnl: 100, notes: ""
     }]);
-    const createdSchedule = {
-      id: "schedule-1",
-      account: "Current",
-      action: "Deposit",
-      amount: 100,
-      description: "Monthly salary",
-      category: "Salary",
-      day_of_month: 1,
-      start_date: "2026-01-01",
-      end_date: null,
-      active: true
-    };
-    portfolioApi.createRecurringTransaction.mockResolvedValue(createdSchedule);
-    portfolioApi.updateRecurringTransaction.mockResolvedValue({
-      ...createdSchedule,
-      description: "Updated salary"
-    });
-    portfolioApi.recurringTransactions
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([createdSchedule]);
     renderPage(<DashboardPage />);
     expect(await screen.findByText("Total balance through time")).toBeInTheDocument();
     expect(screen.queryByLabelText("Currency")).not.toBeInTheDocument();
     expect(screen.getByText("Broker")).toBeInTheDocument();
     expect(screen.getByText("€600.00")).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText("Account"), { target: { value: "Current" } });
-    expect(await screen.findByText("Recurring transactions")).toBeInTheDocument();
-    fireEvent.change(screen.getAllByLabelText("Description")[1], { target: { value: "Monthly salary" } });
-    fireEvent.click(screen.getByRole("button", { name: "Create automation" }));
-    await waitFor(() => expect(portfolioApi.createRecurringTransaction).toHaveBeenCalled());
-    expect(await screen.findByText("Monthly salary")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Automation created and saved to Firebase.");
-    fireEvent.click(screen.getByRole("button", { name: "Edit Monthly salary" }));
-    fireEvent.change(screen.getAllByLabelText("Description")[1], { target: { value: "Updated salary" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    await waitFor(() => expect(portfolioApi.updateRecurringTransaction).toHaveBeenCalledWith(
-      expect.objectContaining({ id: "schedule-1", description: "Updated salary" }),
-      expect.anything()
-    ));
+    fireEvent.change(screen.getByLabelText("Account"), { target: { value: "Primary" } });
+    expect(await screen.findByText("Realized trading performance")).toBeInTheDocument();
   });
 
   it("confirms account deletion from the portfolio list", async () => {
     portfolioApi.accounts.mockResolvedValue([
-      { name: "Emergency", starting_balance: 500, type: "Savings", currency: "EUR" }
+      { name: "Emergency", starting_balance: 500, type: "Trading Account", currency: "EUR" }
     ]);
     portfolioApi.totalDashboard.mockResolvedValue({
       currency: "EUR", account_type: "All Accounts", account_count: 1, balance: 500,
       realised_pnl: 0, total_entries: 0, trade_count: 0, winning_trades: 0,
-      win_rate: 0, average_trade: 0, best_trade: 0, equity_curve: []
+      win_rate: 0, average_trade: 0, best_trade: 0, equity_curve: [], daily_pnl: []
     });
     portfolioApi.deleteAccount.mockResolvedValue({ message: "deleted" });
 
@@ -251,9 +295,7 @@ describe("application pages", () => {
   });
 
   it("blocks the journal when no trading account exists", async () => {
-    portfolioApi.accounts.mockResolvedValue([
-      { name: "Current", starting_balance: 500, type: "Bank Account", currency: "EUR" }
-    ]);
+    portfolioApi.accounts.mockResolvedValue([]);
 
     renderPage(<JournalPage />);
 

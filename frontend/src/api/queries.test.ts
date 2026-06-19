@@ -53,29 +53,6 @@ describe("API queries", () => {
     await portfolioApi.createAsset({ account: "Main", symbol: "BTC", quantity: 1, unit: "units", display_quantity: 1 });
     await portfolioApi.deleteAsset("a1");
     await portfolioApi.totalDashboard("EUR");
-    await portfolioApi.recurringTransactions("Main");
-    await portfolioApi.createRecurringTransaction({
-      account: "Main",
-      action: "Deposit",
-      amount: 100,
-      description: "Salary",
-      category: "Salary",
-      day_of_month: 1,
-      start_date: "2026-01-01",
-      end_date: null
-    });
-    await portfolioApi.updateRecurringTransaction({
-      id: "r1",
-      account: "Main",
-      action: "Withdraw",
-      amount: 25,
-      description: "Subscription",
-      category: "Entertainment",
-      day_of_month: 5,
-      start_date: "2026-01-01",
-      end_date: null
-    });
-    await portfolioApi.deleteRecurringTransaction("r1");
     await portfolioApi.journalSummary("Main / USD");
     await chartsApi.charts();
     await chartsApi.favourites();
@@ -87,17 +64,6 @@ describe("API queries", () => {
     expect(api.put).toHaveBeenCalledWith("/portfolio/trades/t1", { pnl: 2 });
     expect(api.delete).toHaveBeenCalledWith("/portfolio/accounts/Main%20%2F%20EUR");
     expect(api.get).toHaveBeenCalledWith("/portfolio/dashboard", { params: { currency: "EUR" } });
-    expect(api.get).toHaveBeenCalledWith("/portfolio/recurring-transactions", { params: { account: "Main" } });
-    expect(api.put).toHaveBeenCalledWith("/portfolio/recurring-transactions/r1", {
-      account: "Main",
-      action: "Withdraw",
-      amount: 25,
-      description: "Subscription",
-      category: "Entertainment",
-      day_of_month: 5,
-      start_date: "2026-01-01",
-      end_date: null
-    });
     expect(api.get).toHaveBeenCalledWith("/portfolio/journal/Main%20%2F%20USD/summary");
     expect(api.get).toHaveBeenCalledWith("/charts/yield curve/series");
     expect(api.delete).toHaveBeenCalledWith("/admin/users/user-1");

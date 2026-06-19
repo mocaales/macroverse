@@ -58,7 +58,7 @@ def get_current_user(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="An email address is required.")
     email_verified = bool(token.get("email_verified"))
     admin_email = get_settings().admin_email.strip().casefold()
-    role: UserRole = "admin" if email.casefold() == admin_email else "user"
+    role: UserRole = "admin" if email_verified and email.casefold() == admin_email else "user"
     return AuthenticatedUser(
         uid=token["uid"],
         email=email,

@@ -66,7 +66,6 @@ Docker starts:
 - Nginx serving the built React application on port `8080`
 - FastAPI on port `8000`
 - TimescaleDB on the configured PostgreSQL port
-- The recurring market-data worker
 
 The Nginx container proxies `/api/` to the backend container, so the default frontend API URL remains `/api/v1`.
 

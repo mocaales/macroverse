@@ -11,15 +11,12 @@ from app.models.portfolio import (
     AssetResponse,
     DashboardSummary,
     JournalSummary,
-    RecurringTransactionCreate,
-    RecurringTransactionResponse,
     TradeCreate,
     TradeResponse,
     TradeUpdate,
 )
 from app.repositories.portfolio import PortfolioRepository
 from app.services.analytics import aggregate_dashboard_summary, dashboard_summary, journal_summary
-from app.services.recurring_transactions import sync_recurring_transactions
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -64,28 +61,22 @@ def trades(
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
     account: Annotated[str | None, Query()] = None,
 ) -> list[dict]:
-    sync_recurring_transactions(repository, user.uid)
     return repository.list_trades(user.uid, account)
 
 
 def _prepare_entry(payload: TradeCreate | TradeUpdate, account: dict) -> dict:
     data = payload.model_dump()
-    account_type = account.get("type", "Trading Account")
-    if account_type != "Trading Account" and payload.action == "Trade":
-        raise HTTPException(status_code=422, detail=f"{account_type} accounts only support deposits and withdrawals.")
+    if account.get("type", "Trading Account") != "Trading Account":
+        raise HTTPException(status_code=422, detail="Only Trading Accounts are supported.")
     if payload.action == "Trade":
         if not payload.symbol.strip():
             raise HTTPException(status_code=422, detail="A symbol is required for trades.")
         data["symbol"] = payload.symbol.upper()
         return data
 
-    if account_type in {"Savings", "Bank Account"} and not payload.description.strip():
-        raise HTTPException(status_code=422, detail="A description is required for cash transactions.")
-    if account_type == "Bank Account" and payload.category is None:
-        raise HTTPException(status_code=422, detail="A category is required for bank transactions.")
     data["symbol"] = "CASH"
     data["type"] = None
-    data["category"] = payload.category or ("Savings" if account_type == "Savings" else None)
+    data["category"] = payload.category
     data["pnl"] = -abs(payload.pnl) if payload.action == "Withdraw" else abs(payload.pnl)
     return data
 
@@ -171,81 +162,6 @@ def create_asset(
     return repository.create_asset(user.uid, payload.model_dump())
 
 
-@router.get("/recurring-transactions", response_model=list[RecurringTransactionResponse])
-def recurring_transactions(
-    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-    account: Annotated[str | None, Query()] = None,
-) -> list[dict]:
-    sync_recurring_transactions(repository, user.uid)
-    return repository.list_recurring_transactions(user.uid, account)
-
-
-@router.post(
-    "/recurring-transactions",
-    response_model=RecurringTransactionResponse,
-    status_code=status.HTTP_201_CREATED,
-    responses={
-        404: {"description": "Account not found."},
-        422: {"description": "Only bank accounts support automation."},
-    },
-)
-def create_recurring_transaction(
-    payload: RecurringTransactionCreate,
-    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-) -> dict:
-    account = repository.get_account(user.uid, payload.account)
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
-    if account["type"] != "Bank Account":
-        raise HTTPException(status_code=422, detail="Recurring transactions are only available for bank accounts.")
-    schedule = repository.create_recurring_transaction(user.uid, payload.model_dump())
-    sync_recurring_transactions(repository, user.uid)
-    return schedule
-
-
-@router.put(
-    "/recurring-transactions/{schedule_id}",
-    response_model=RecurringTransactionResponse,
-    responses={
-        404: {"description": "Recurring transaction or account not found."},
-        422: {"description": "Only bank accounts support automation."},
-    },
-)
-def update_recurring_transaction(
-    schedule_id: str,
-    payload: RecurringTransactionCreate,
-    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-) -> dict:
-    account = repository.get_account(user.uid, payload.account)
-    if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
-    if account["type"] != "Bank Account":
-        raise HTTPException(status_code=422, detail="Recurring transactions are only available for bank accounts.")
-    schedule = repository.update_recurring_transaction(user.uid, schedule_id, payload.model_dump())
-    if not schedule:
-        raise HTTPException(status_code=404, detail="Recurring transaction not found.")
-    sync_recurring_transactions(repository, user.uid)
-    return schedule
-
-
-@router.delete(
-    "/recurring-transactions/{schedule_id}",
-    response_model=Message,
-    responses={404: {"description": "Recurring transaction not found."}},
-)
-def delete_recurring_transaction(
-    schedule_id: str,
-    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
-    repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
-) -> dict:
-    if not repository.delete_recurring_transaction(user.uid, schedule_id):
-        raise HTTPException(status_code=404, detail="Recurring transaction not found.")
-    return {"message": "Recurring transaction deleted."}
-
-
 @router.delete(
     "/assets/{asset_id}",
     response_model=Message,
@@ -271,7 +187,6 @@ def total_dashboard(
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
     currency: Annotated[str, Query(min_length=3, max_length=3)] = "EUR",
 ) -> dict:
-    sync_recurring_transactions(repository, user.uid)
     return aggregate_dashboard_summary(
         repository.list_accounts(user.uid),
         repository.list_trades(user.uid),
@@ -289,7 +204,6 @@ def dashboard(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
 ) -> dict:
-    sync_recurring_transactions(repository, user.uid)
     account = repository.get_account(user.uid, account_name)
     if not account:
         raise HTTPException(status_code=404, detail="Account not found.")
