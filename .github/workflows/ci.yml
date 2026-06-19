@@ -44,7 +44,7 @@ jobs:
           cp .env.ci backend/.env
       - name: Start CI TimescaleDB
         run: docker compose --env-file .env.ci up -d --wait timescaledb
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
