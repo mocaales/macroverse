@@ -77,6 +77,27 @@ describe("dashboard forms", () => {
     expect(screen.getByLabelText("Realised P&L")).toHaveValue(null);
   });
 
+  it.each([
+    { action: "Trade", expected: 20, result: "profit" },
+    { action: "Trade", expected: 0, result: "flat" },
+    { action: "Deposit", expected: 20, result: "profit" }
+  ] as const)("submits $action entries with a $result result", ({ action, expected, result }) => {
+    const onSubmit = vi.fn();
+    render(<TradeForm account="Main" busy={false} onSubmit={onSubmit} />);
+
+    fireEvent.change(screen.getByLabelText("Action"), { target: { value: action } });
+    if (action === "Trade") {
+      fireEvent.change(screen.getByLabelText("Symbol"), { target: { value: "btc" } });
+      fireEvent.change(screen.getByLabelText("Trade result"), { target: { value: result } });
+    }
+    fireEvent.change(screen.getByLabelText(action === "Trade" ? "Realised P&L" : "Amount"), {
+      target: { value: "20" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Submit entry" }));
+
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ action, pnl: expected }));
+  });
+
   it("recalculates position sizing from user inputs", () => {
     const view = render(<RiskCalculator initialBalance={10_000} />);
 

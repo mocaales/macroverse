@@ -73,6 +73,7 @@ class ResizeObserverMock {
 vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 
 import { BalanceLineChart } from "./BalanceLineChart";
+import { balanceDeltaTone } from "./balanceChartUtils";
 
 interface ChartOptionsUnderTest {
   localization: {
@@ -100,6 +101,12 @@ describe("BalanceLineChart", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     ResizeObserverMock.instances = [];
+  });
+
+  it("classifies positive, negative, and unchanged balance movements", () => {
+    expect(balanceDeltaTone(1)).toBe("positive");
+    expect(balanceDeltaTone(-1)).toBe("negative");
+    expect(balanceDeltaTone(0)).toBe("neutral");
   });
 
   it("renders a lightweight balance chart and expands single-point data", () => {

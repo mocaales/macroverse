@@ -31,6 +31,12 @@ function dayNumber(value: Date) {
   return value.getUTCDate();
 }
 
+function pnlTone(value: number) {
+  if (value > 0) return "gain";
+  if (value < 0) return "loss";
+  return "flat";
+}
+
 function formatMoney(value: number, currency: CurrencyCode, sign = false) {
   const formatted = new Intl.NumberFormat("en-US", {
     currency,
@@ -63,7 +69,8 @@ export function DailyPnlCalendar({ currency, points }: DailyPnlCalendarProps) {
     [points]
   );
   const months = useMemo(() => {
-    const uniqueMonths = [...new Set(points.map((point) => monthKey(point.date)))].sort();
+    const uniqueMonths = [...new Set(points.map((point) => monthKey(point.date)))]
+      .sort((left, right) => left.localeCompare(right));
     return uniqueMonths.length ? uniqueMonths : [new Date().toISOString().slice(0, 7)];
   }, [points]);
   const [selectedMonth, setSelectedMonth] = useState(months.at(-1) || new Date().toISOString().slice(0, 7));
@@ -104,7 +111,7 @@ export function DailyPnlCalendar({ currency, points }: DailyPnlCalendarProps) {
               if (!calendarDay) return <span aria-hidden="true" className="calendar-day empty" key={item.key} />;
               const pnlPoint = pointsByDate.get(calendarDay.key);
               const pnl = pnlPoint?.pnl || 0;
-              const tone = pnl > 0 ? "gain" : pnl < 0 ? "loss" : "flat";
+              const tone = pnlTone(pnl);
               return (
                 <span className={`calendar-day ${tone}`} key={calendarDay.key}>
                   <strong>{dayNumber(calendarDay.date)}</strong>

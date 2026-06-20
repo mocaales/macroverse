@@ -14,6 +14,12 @@ interface TradeFormProps {
   readonly busy: boolean;
 }
 
+function signedAmount(action: ActionType, tradeResult: "profit" | "loss" | "flat", amount: number) {
+  if (action === "Withdraw" || (action === "Trade" && tradeResult === "loss")) return -amount;
+  if (action === "Trade" && tradeResult === "flat") return 0;
+  return amount;
+}
+
 export function TradeForm({
   account,
   onSubmit,
@@ -27,18 +33,11 @@ export function TradeForm({
   const [tradeResult, setTradeResult] = useState<"profit" | "loss" | "flat">("profit");
 
   const numericAmount = Math.abs(Number(amount) || 0);
-  const displayedAmount = action === "Trade" && tradeResult === "loss" && amount
-    ? `-${numericAmount}`
-    : amount;
-  const pnl = action === "Trade"
-    ? tradeResult === "loss"
-      ? -numericAmount
-      : tradeResult === "flat"
-        ? 0
-        : numericAmount
-    : action === "Withdraw"
-      ? -numericAmount
-      : numericAmount;
+  let displayedAmount = amount;
+  if (action === "Trade" && tradeResult === "loss" && amount) {
+    displayedAmount = `-${numericAmount}`;
+  }
+  const pnl = signedAmount(action, tradeResult, numericAmount);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

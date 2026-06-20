@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from app.api.dependencies import AuthenticatedUser, get_current_user, get_portfolio_repository
 from app.models.common import Message
 from app.models.portfolio import (
+    TRADING_ACCOUNT_TYPE,
     AccountCreate,
     AccountResponse,
     AssetCreate,
@@ -19,6 +20,8 @@ from app.repositories.portfolio import PortfolioRepository
 from app.services.analytics import aggregate_dashboard_summary, dashboard_summary, journal_summary
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+ACCOUNT_NOT_FOUND = "Account not found."
+TRADE_NOT_FOUND = "Trade not found."
 
 
 @router.get("/accounts", response_model=list[AccountResponse])
@@ -43,7 +46,7 @@ def create_account(
 @router.delete(
     "/accounts/{account_name}",
     response_model=Message,
-    responses={404: {"description": "Account not found."}},
+    responses={404: {"description": ACCOUNT_NOT_FOUND}},
 )
 def delete_account(
     account_name: str,
@@ -51,7 +54,7 @@ def delete_account(
     repository: Annotated[PortfolioRepository, Depends(get_portfolio_repository)],
 ) -> dict:
     if not repository.delete_account(user.uid, account_name):
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise HTTPException(status_code=404, detail=ACCOUNT_NOT_FOUND)
     return {"message": "Account and related portfolio data deleted."}
 
 
@@ -66,7 +69,7 @@ def trades(
 
 def _prepare_entry(payload: TradeCreate | TradeUpdate, account: dict) -> dict:
     data = payload.model_dump()
-    if account.get("type", "Trading Account") != "Trading Account":
+    if account.get("type", TRADING_ACCOUNT_TYPE) != TRADING_ACCOUNT_TYPE:
         raise HTTPException(status_code=422, detail="Only Trading Accounts are supported.")
     if payload.action == "Trade":
         if not payload.symbol.strip():
@@ -86,7 +89,7 @@ def _prepare_entry(payload: TradeCreate | TradeUpdate, account: dict) -> dict:
     response_model=TradeResponse,
     status_code=status.HTTP_201_CREATED,
     responses={
-        404: {"description": "Account not found."},
+        404: {"description": ACCOUNT_NOT_FOUND},
         422: {"description": "The transaction is not valid for this account type."},
     },
 )
@@ -97,7 +100,7 @@ def create_trade(
 ) -> dict:
     account = repository.get_account(user.uid, payload.account)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise HTTPException(status_code=404, detail=ACCOUNT_NOT_FOUND)
     return repository.create_trade(user.uid, _prepare_entry(payload, account))
 
 
@@ -117,21 +120,21 @@ def update_trade(
 ) -> dict:
     existing = repository.get_trade(user.uid, trade_id)
     if not existing:
-        raise HTTPException(status_code=404, detail="Trade not found.")
+        raise HTTPException(status_code=404, detail=TRADE_NOT_FOUND)
     account = repository.get_account(user.uid, existing["account"])
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise HTTPException(status_code=404, detail=ACCOUNT_NOT_FOUND)
     data = _prepare_entry(payload, account)
     trade = repository.update_trade(user.uid, trade_id, data)
     if not trade:
-        raise HTTPException(status_code=404, detail="Trade not found.")
+        raise HTTPException(status_code=404, detail=TRADE_NOT_FOUND)
     return trade
 
 
 @router.delete(
     "/trades/{trade_id}",
     response_model=Message,
-    responses={404: {"description": "Trade not found."}},
+    responses={404: {"description": TRADE_NOT_FOUND}},
 )
 def delete_trade(
     trade_id: str,
@@ -140,7 +143,7 @@ def delete_trade(
 ) -> dict:
     deleted = repository.delete_trade(user.uid, trade_id)
     if not deleted:
-        raise HTTPException(status_code=404, detail="Trade not found.")
+        raise HTTPException(status_code=404, detail=TRADE_NOT_FOUND)
     return {"message": "Trade deleted."}
 
 
@@ -197,7 +200,7 @@ def total_dashboard(
 @router.get(
     "/dashboard/{account_name}",
     response_model=DashboardSummary,
-    responses={404: {"description": "Account not found."}},
+    responses={404: {"description": ACCOUNT_NOT_FOUND}},
 )
 def dashboard(
     account_name: str,
@@ -206,11 +209,18 @@ def dashboard(
 ) -> dict:
     account = repository.get_account(user.uid, account_name)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
+        raise HTTPException(status_code=404, detail=ACCOUNT_NOT_FOUND)
     return dashboard_summary(account, repository.list_trades(user.uid, account_name))
 
 
-@router.get("/journal/{account_name}/summary", response_model=JournalSummary)
+@router.get(
+    "/journal/{account_name}/summary",
+    response_model=JournalSummary,
+    responses={
+        404: {"description": ACCOUNT_NOT_FOUND},
+        422: {"description": "The journal is available only for trading accounts."},
+    },
+)
 def journal(
     account_name: str,
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
@@ -218,7 +228,7 @@ def journal(
 ) -> dict:
     account = repository.get_account(user.uid, account_name)
     if not account:
-        raise HTTPException(status_code=404, detail="Account not found.")
-    if account["type"] != "Trading Account":
+        raise HTTPException(status_code=404, detail=ACCOUNT_NOT_FOUND)
+    if account["type"] != TRADING_ACCOUNT_TYPE:
         raise HTTPException(status_code=422, detail="The journal is available only for Trading Accounts.")
     return journal_summary(repository.list_trades(user.uid, account_name))

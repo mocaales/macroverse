@@ -91,6 +91,16 @@ function tradesInRange(transactions: Trade[], startDate: string, endDate: string
   });
 }
 
+function percentage(part: number, total: number) {
+  return total ? part / total * 100 : 0;
+}
+
+function calculateProfitFactor(grossProfit: number, grossLoss: number) {
+  if (grossLoss) return grossProfit / grossLoss;
+  if (grossProfit > 0) return Number.POSITIVE_INFINITY;
+  return 0;
+}
+
 function downloadEquityReport(account: string, currency: CurrencyCode, points: DashboardSummary["equity_curve"]) {
   const rows = ["date,balance,currency", ...points.map((point) => `${isoDay(point.date)},${point.balance},${currency}`)];
   const url = URL.createObjectURL(new Blob([rows.join("\n")], { type: "text/csv;charset=utf-8" }));
@@ -132,7 +142,7 @@ function PerformanceWorkspace({
     : 0;
   const winningTrades = periodTrades.filter((trade) => trade.pnl > 0).length;
   const winRate = hasTransactionData
-    ? periodTrades.length ? winningTrades / periodTrades.length * 100 : 0
+    ? percentage(winningTrades, periodTrades.length)
     : summary?.win_rate || 0;
   const realisedTradePnl = hasTransactionData
     ? periodTrades.reduce((sum, trade) => sum + trade.pnl, 0)
@@ -231,7 +241,9 @@ function monthlyPnlStats(equityCurve: DashboardSummary["equity_curve"], transact
     rows.set(month, row);
     months.add(month);
   });
-  return [...months].sort().map((month) => ({ month, ...(rows.get(month) || { trades: 0, value: 0 }) }));
+  return [...months]
+    .sort((left, right) => left.localeCompare(right))
+    .map((month) => ({ month, ...(rows.get(month) || { trades: 0, value: 0 }) }));
 }
 
 function MonthlyStatsPanel({
@@ -290,7 +302,7 @@ function tradingIntelligence(transactions: Trade[]) {
     breakEven,
     expectancy: trades.length ? (grossProfit - grossLoss) / trades.length : 0,
     losses: losses.length,
-    profitFactor: grossLoss ? grossProfit / grossLoss : grossProfit > 0 ? Number.POSITIVE_INFINITY : 0,
+    profitFactor: calculateProfitFactor(grossProfit, grossLoss),
     recent: [...trades].sort((a, b) => b.trade_time.localeCompare(a.trade_time)).slice(0, 5),
     symbols: [...symbols.entries()]
       .map(([symbol, value]) => ({ symbol, ...value }))
@@ -369,11 +381,11 @@ function TradingIntelligence({ currency, transactions }: { readonly currency: Cu
 }
 
 interface AccountViewProps {
-  account: Account;
-  summary?: DashboardSummary;
-  transactions: Trade[];
-  createEntry: (payload: TradePayload) => void;
-  entryPending: boolean;
+  readonly account: Account;
+  readonly summary?: DashboardSummary;
+  readonly transactions: Trade[];
+  readonly createEntry: (payload: TradePayload) => void;
+  readonly entryPending: boolean;
 }
 
 function AccountView({
@@ -474,7 +486,7 @@ function TotalView({
       </section>
       {accountToDelete && (
         <div className="modal-backdrop">
-          <section aria-labelledby="delete-account-title" aria-modal="true" className="modal" role="dialog">
+          <dialog aria-labelledby="delete-account-title" className="modal" open>
             <button
               aria-label="Close delete account dialog"
               className="icon-button modal-close"
@@ -504,7 +516,7 @@ function TotalView({
                 Delete account
               </button>
             </div>
-          </section>
+          </dialog>
         </div>
       )}
     </>
@@ -559,7 +571,8 @@ export function DashboardPage() {
   const accounts = useQuery({ queryKey: ["accounts"], queryFn: portfolioApi.accounts, enabled: Boolean(user) });
   const account = accounts.data?.find((item) => item.name === selected);
   const availableCurrencies = useMemo(
-    () => [...new Set((accounts.data || []).map((item) => item.currency))].sort(),
+    () => [...new Set((accounts.data || []).map((item) => item.currency))]
+      .sort((left, right) => left.localeCompare(right)),
     [accounts.data]
   );
   const accountSummary = useQuery({

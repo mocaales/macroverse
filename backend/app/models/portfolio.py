@@ -3,6 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+TRADING_ACCOUNT_TYPE = "Trading Account"
 AccountType = Literal["Trading Account"]
 CurrencyCode = Literal["EUR", "USD", "GBP", "CHF", "JPY", "CAD", "AUD"]
 ActionType = Literal["Trade", "Deposit", "Withdraw"]
@@ -29,8 +30,8 @@ TransactionCategory = Literal[
 
 def normalize_account_type(value: str) -> str:
     legacy_types = {
-        "Trading": "Trading Account",
-        "Investing": "Trading Account",
+        "Trading": TRADING_ACCOUNT_TYPE,
+        "Investing": TRADING_ACCOUNT_TYPE,
     }
     return legacy_types.get(value, value)
 

@@ -22,6 +22,7 @@ import {
   type NumericRange
 } from "../features/charts/ytdChartInteraction";
 import type { CurrencyCode, DashboardSummary } from "../types";
+import { balanceDeltaTone, type BalanceDeltaTone } from "./balanceChartUtils";
 
 type BalancePoint = DashboardSummary["equity_curve"][number];
 type BalanceSeries = ISeriesApi<"Area">;
@@ -34,7 +35,7 @@ interface BalanceLineChartProps {
 interface TooltipState {
   readonly date: string;
   readonly delta: string;
-  readonly deltaTone: "positive" | "negative" | "neutral";
+  readonly deltaTone: BalanceDeltaTone;
   readonly left: number;
   readonly top: number;
   readonly value: string;
@@ -228,7 +229,7 @@ export function BalanceLineChart({ currency, points }: BalanceLineChartProps) {
       setTooltip({
         date: formatTooltipDate(param.time),
         delta: `${dailyChange >= 0 ? "+" : ""}${formatTooltipMoney(dailyChange, currency)}`,
-        deltaTone: dailyChange > 0 ? "positive" : dailyChange < 0 ? "negative" : "neutral",
+        deltaTone: balanceDeltaTone(dailyChange),
         left,
         top,
         value: formatTooltipMoney(seriesValue.value, currency)
